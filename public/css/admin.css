@@ -1,0 +1,592 @@
+/* Khu quan tri - The Gats Booking */
+
+:root {
+    --bg: #0f0e0d;
+    --panel: #1a1816;
+    --panel-2: #211e1b;
+    --line: #2f2a25;
+    --line-soft: #262220;
+    --gold: #c8a15a;
+    --gold-soft: #e0c48c;
+    --text: #efeae3;
+    --muted: #9b9188;
+    --danger: #e0685f;
+    --ok: #6fbf7a;
+    --info: #78aae6;
+    --radius: 12px;
+}
+
+* { box-sizing: border-box; }
+
+body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.5;
+}
+
+a { color: var(--gold-soft); }
+
+/* --- Khung --- */
+
+.shell { display: flex; min-height: 100vh; }
+
+.side {
+    width: 232px;
+    flex: 0 0 232px;
+    background: #141210;
+    border-right: 1px solid var(--line);
+    padding: 20px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.side-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 8px 18px;
+    text-decoration: none;
+    color: var(--text);
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 14px;
+}
+
+.side-mark {
+    width: 34px; height: 34px;
+    border: 1px solid var(--gold);
+    border-radius: 50%;
+    display: grid; place-items: center;
+    color: var(--gold); font-weight: 700; font-size: 12px;
+}
+
+.side-brand b { display: block; font-size: 14px; letter-spacing: .14em; text-transform: uppercase; }
+.side-brand span { font-size: 11px; color: var(--muted); letter-spacing: .1em; }
+
+.nav-link {
+    display: block;
+    padding: 9px 12px;
+    border-radius: 8px;
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 14.5px;
+    transition: .13s;
+}
+
+.nav-link:hover { background: #1e1b18; color: var(--text); }
+.nav-link.active { background: rgba(200, 161, 90, .14); color: var(--gold-soft); font-weight: 600; }
+
+.nav-group {
+    font-size: 11px;
+    letter-spacing: .16em;
+    text-transform: uppercase;
+    color: #6b6259;
+    padding: 16px 12px 6px;
+}
+
+.side-foot { margin-top: auto; border-top: 1px solid var(--line); padding-top: 14px; }
+.side-user { padding: 0 12px 10px; font-size: 13px; }
+.side-user b { display: block; }
+.side-user span { color: var(--muted); font-size: 12px; }
+
+.main { flex: 1; min-width: 0; padding: 24px 28px 60px; }
+
+.page-head {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 20px;
+}
+
+.page-head h1 { margin: 0; font-size: 23px; font-weight: 600; }
+.page-head p { margin: 4px 0 0; color: var(--muted); font-size: 14px; }
+
+/* --- Card --- */
+
+.card {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 18px;
+}
+
+.card + .card { margin-top: 16px; }
+
+.card h2 { margin: 0 0 4px; font-size: 16px; font-weight: 600; }
+.card h2 + p.sub { margin: 0 0 14px; color: var(--muted); font-size: 13.5px; }
+
+/* --- So lieu --- */
+
+.stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 12px;
+    margin-bottom: 18px;
+}
+
+.stat {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+}
+
+.stat b { display: block; font-size: 26px; font-weight: 600; line-height: 1.2; }
+.stat span { font-size: 12.5px; color: var(--muted); }
+.stat.accent b { color: var(--gold); }
+.stat.warn b { color: var(--danger); }
+
+/* --- Bang --- */
+
+.table-wrap { overflow-x: auto; }
+
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+
+th {
+    text-align: left;
+    font-weight: 600;
+    font-size: 12px;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+    color: var(--muted);
+    padding: 9px 10px;
+    border-bottom: 1px solid var(--line);
+    white-space: nowrap;
+}
+
+td { padding: 11px 10px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
+
+tbody tr:hover { background: #1e1b18; }
+
+td.num, th.num { text-align: right; }
+
+.empty { padding: 26px 10px; text-align: center; color: var(--muted); }
+
+/* --- Form --- */
+
+.form-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 14px;
+}
+
+.field { display: flex; flex-direction: column; gap: 5px; }
+.field.full { grid-column: 1 / -1; }
+
+label { font-size: 12.5px; color: var(--muted); }
+
+input[type=text], input[type=tel], input[type=email], input[type=date],
+input[type=time], input[type=number], input[type=password], select, textarea {
+    background: #141210;
+    border: 1px solid var(--line);
+    color: var(--text);
+    border-radius: 8px;
+    padding: 8px 11px;
+    font: inherit;
+    font-size: 14px;
+    width: 100%;
+}
+
+input:focus, select:focus, textarea:focus {
+    outline: none;
+    border-color: var(--gold);
+    box-shadow: 0 0 0 3px rgba(200, 161, 90, .14);
+}
+
+textarea { resize: vertical; min-height: 70px; }
+
+.check { display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text); }
+.check input { width: auto; }
+
+.hint { font-size: 12px; color: var(--muted); }
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--gold);
+    color: #17130d;
+    border: 1px solid var(--gold);
+    border-radius: 8px;
+    padding: 8px 16px;
+    font: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+}
+
+.btn:hover { background: var(--gold-soft); }
+
+.btn-sm { padding: 5px 11px; font-size: 13px; }
+
+.btn-ghost { background: transparent; color: var(--gold-soft); border-color: var(--line); font-weight: 500; }
+.btn-ghost:hover { background: #221e1a; border-color: var(--gold); }
+
+.btn-danger { background: transparent; color: var(--danger); border-color: rgba(224, 104, 95, .4); font-weight: 500; }
+.btn-danger:hover { background: rgba(224, 104, 95, .12); }
+
+.btn-ok { background: transparent; color: #8fd39a; border-color: rgba(111, 191, 122, .4); font-weight: 500; }
+.btn-ok:hover { background: rgba(111, 191, 122, .12); }
+
+/* --- Loc --- */
+
+.filters {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    margin-bottom: 16px;
+}
+
+.filters .field { min-width: 130px; }
+
+/* --- Trang thai --- */
+
+.pill {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.status-pending { background: rgba(200, 161, 90, .16); color: var(--gold-soft); }
+.status-confirmed { background: rgba(111, 191, 122, .16); color: #a5dcad; }
+.status-seated { background: rgba(120, 170, 230, .16); color: #a8c8ee; }
+.status-completed { background: rgba(160, 160, 160, .14); color: #c2bcb4; }
+.status-cancelled, .status-no_show { background: rgba(224, 104, 95, .14); color: #f0a9a3; }
+
+/* --- So do ban --- */
+
+.floor-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); }
+
+table.floor { border-collapse: separate; border-spacing: 0; font-size: 12.5px; min-width: 700px; }
+
+table.floor th, table.floor td { border-bottom: 1px solid var(--line-soft); padding: 0; }
+
+table.floor th.slot-head {
+    padding: 8px 4px;
+    text-align: center;
+    font-size: 11px;
+    letter-spacing: 0;
+    border-left: 1px solid var(--line-soft);
+    min-width: 54px;
+}
+
+table.floor th.table-head {
+    position: sticky;
+    left: 0;
+    background: var(--panel);
+    z-index: 2;
+    padding: 8px 12px;
+    min-width: 132px;
+}
+
+table.floor td.table-cell {
+    position: sticky;
+    left: 0;
+    background: var(--panel);
+    z-index: 1;
+    padding: 8px 12px;
+    border-right: 1px solid var(--line);
+}
+
+table.floor td.table-cell b { font-size: 13.5px; }
+table.floor td.table-cell span { display: block; color: var(--muted); font-size: 11.5px; }
+
+.cell {
+    height: 42px;
+    border-left: 1px solid var(--line-soft);
+    text-align: center;
+    vertical-align: middle;
+}
+
+.cell.free { background: #16221a33; }
+
+.cell.busy {
+    background: rgba(200, 161, 90, .22);
+    border-left-color: rgba(200, 161, 90, .3);
+}
+
+.cell.busy a {
+    display: block;
+    padding: 4px 2px;
+    color: var(--gold-soft);
+    text-decoration: none;
+    font-size: 11.5px;
+    font-weight: 600;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.cell.busy.is-seated { background: rgba(120, 170, 230, .22); }
+.cell.busy.is-seated a { color: #a8c8ee; }
+
+.cell.busy.is-pending { background: rgba(200, 161, 90, .12); }
+
+/* --- Thong bao --- */
+
+.alert {
+    border-radius: 9px;
+    padding: 11px 15px;
+    font-size: 14px;
+    margin-bottom: 16px;
+    border: 1px solid;
+}
+
+.alert-ok { background: rgba(111, 191, 122, .1); border-color: rgba(111, 191, 122, .4); color: #a5dcad; }
+.alert-error { background: rgba(224, 104, 95, .1); border-color: rgba(224, 104, 95, .45); color: #f0a9a3; }
+.alert-info { background: rgba(200, 161, 90, .08); border-color: rgba(200, 161, 90, .35); color: var(--gold-soft); }
+
+/* --- Tien ich --- */
+
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.between { justify-content: space-between; }
+.muted { color: var(--muted); }
+.mb-0 { margin-bottom: 0; }
+.mt-0 { margin-top: 0; }
+.small { font-size: 12.5px; }
+.grid-2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; align-items: start; }
+.grid-2 .card + .card { margin-top: 0; }
+
+details.inline-edit summary {
+    cursor: pointer;
+    color: var(--gold-soft);
+    font-size: 13px;
+    list-style: none;
+}
+
+details.inline-edit summary::-webkit-details-marker { display: none; }
+details.inline-edit[open] summary { color: var(--muted); }
+details.inline-edit > div { margin-top: 10px; padding: 12px; background: var(--panel-2); border-radius: 8px; }
+
+.pagination-wrap { margin-top: 16px; }
+.pagination-wrap nav { font-size: 13px; }
+
+/* --- Dang nhap --- */
+
+.login-page {
+    min-height: 100vh;
+    display: grid;
+    place-items: center;
+    padding: 20px;
+    background: radial-gradient(900px 480px at 50% -10%, #241f18 0%, transparent 70%), var(--bg);
+}
+
+.login-card { width: min(100%, 380px); }
+.login-card .side-brand { justify-content: center; border: none; margin-bottom: 8px; }
+
+@media (max-width: 860px) {
+    .shell { flex-direction: column; }
+    .side { width: 100%; flex: none; flex-direction: row; flex-wrap: wrap; align-items: center; padding: 12px; }
+    .side-brand { border: none; margin: 0 12px 0 0; padding: 0; }
+    .nav-group { display: none; }
+    .side-foot { margin: 0 0 0 auto; border: none; padding: 0; }
+    .side-user { display: none; }
+    .main { padding: 18px 14px 48px; }
+}
+
+/* --- Thao tac ngay tren dong danh sach --- */
+
+.row-actions {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+.row-actions form { display: inline; }
+
+/* Khach da qua gio hen ma chua bao den - can goi kiem tra. */
+tbody tr.is-late td { background: rgba(224, 104, 95, .07); }
+tbody tr.is-late:hover td { background: rgba(224, 104, 95, .12); }
+
+/* Bang xep ban o che do chi xem thi khong bam duoc. */
+form.is-readonly input { pointer-events: none; opacity: .65; }
+
+/* ==========================================================================
+   Trang bao cao
+   ========================================================================== */
+
+.report-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 14px;
+}
+
+.report-head h2 { margin: 0; font-size: 16px; font-weight: 600; }
+.report-head p { margin: 2px 0 0; color: var(--muted); font-size: 13px; max-width: 62ch; }
+
+/* --- Bo loc: mot hang duy nhat, ap dung cho toan bo trang --- */
+
+.range-presets { display: flex; gap: 6px; }
+
+.range-presets a {
+    padding: 8px 14px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 13.5px;
+    white-space: nowrap;
+}
+
+.range-presets a:hover { border-color: var(--gold); color: var(--gold-soft); }
+.range-presets a.is-active { background: var(--gold); border-color: var(--gold); color: #17130d; font-weight: 600; }
+
+/* --- O so lieu --- */
+
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(168px, 1fr));
+    gap: 12px;
+    margin-bottom: 18px;
+}
+
+.kpi {
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.kpi-label { font-size: 12.5px; color: var(--muted); }
+
+.kpi-value {
+    font-size: 27px;
+    font-weight: 600;
+    line-height: 1.15;
+    /* Chu so ti le, khong dung tabular-nums o con so lon dung mot minh. */
+}
+
+.kpi-value small { font-size: 15px; font-weight: 500; color: var(--muted); margin-left: 2px; }
+
+.kpi-delta { font-size: 12.5px; display: flex; align-items: center; gap: 5px; }
+.kpi-delta .dir { font-weight: 700; }
+.kpi-delta.up .dir { color: #8fd39a; }
+.kpi-delta.down .dir { color: #f0a9a3; }
+.kpi-delta.flat .dir { color: var(--muted); }
+.kpi-delta span { color: var(--muted); }
+
+/* Mot so chi so thi tang la xau (khong den, huy) - dao mau lai. */
+.kpi.inverse .kpi-delta.up .dir { color: #f0a9a3; }
+.kpi.inverse .kpi-delta.down .dir { color: #8fd39a; }
+
+/* --- Khung bieu do --- */
+
+.viz-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+    gap: 16px;
+    align-items: start;
+}
+
+.viz-figure { margin: 0; position: relative; }
+.viz-figure .viz-plot { position: relative; min-height: 40px; }
+.viz-figure svg { display: block; overflow: visible; }
+
+.viz-figure .viz-table { display: none; }
+.viz-figure.is-table .viz-plot { display: none; }
+.viz-figure.is-table .viz-table { display: block; }
+
+.viz-toggle {
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--muted);
+    border-radius: 8px;
+    padding: 5px 11px;
+    font: inherit;
+    font-size: 12.5px;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+.viz-toggle:hover { border-color: var(--gold); color: var(--gold-soft); }
+
+.viz-empty { color: var(--muted); font-size: 13.5px; padding: 20px 0; margin: 0; text-align: center; }
+
+/* --- Chu giai --- */
+
+.viz-legend {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 16px;
+    margin: 12px 0 0;
+    font-size: 12.5px;
+    color: var(--muted);
+}
+
+.viz-legend span { display: inline-flex; align-items: center; gap: 6px; }
+.viz-legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+
+/* --- Chu thich khi ro chuot --- */
+
+.viz-tip {
+    position: absolute;
+    z-index: 5;
+    pointer-events: none;
+    background: #100f0d;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 12.5px;
+    line-height: 1.5;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, .5);
+    min-width: 128px;
+}
+
+.viz-tip strong { display: block; margin-bottom: 4px; font-size: 13px; }
+.viz-tip div { display: flex; align-items: center; gap: 7px; }
+.viz-tip div span { color: var(--muted); margin-right: auto; }
+.viz-tip div b { font-variant-numeric: tabular-nums; }
+.viz-tip i { width: 8px; height: 8px; border-radius: 2px; display: inline-block; flex: 0 0 8px; }
+
+/* --- Thanh ngang (phieu quy trinh, co cau nguon) --- */
+
+.viz-rows { display: flex; flex-direction: column; gap: 12px; }
+.viz-row { display: flex; flex-direction: column; gap: 6px; border-radius: 6px; }
+.viz-row:focus-visible { outline: 2px solid var(--gold); outline-offset: 3px; }
+
+.viz-row-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; font-size: 13.5px; }
+.viz-row-head span { color: var(--muted); }
+.viz-row-head b { font-variant-numeric: tabular-nums; }
+
+.viz-row-track { height: 10px; background: #221e1a; border-radius: 5px; overflow: hidden; }
+.viz-row-track span { display: block; height: 100%; border-radius: 5px; }
+
+/* --- Phieu quy trinh: hien so roi giua cac buoc --- */
+
+.funnel-drop {
+    font-size: 12px;
+    color: var(--muted);
+    padding: 2px 0 0 2px;
+}
+
+.funnel-drop b { color: #f0a9a3; font-variant-numeric: tabular-nums; }
+
+/* Bang so lieu trong bieu do */
+.viz-table table { font-size: 13px; }
+.viz-table td, .viz-table th { padding: 7px 9px; }
+.viz-table td { font-variant-numeric: tabular-nums; }
+
+rect:focus-visible, g:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+
+@media (max-width: 700px) {
+    .viz-grid { grid-template-columns: 1fr; }
+    .range-presets { width: 100%; }
+    .range-presets a { flex: 1; text-align: center; }
+}
