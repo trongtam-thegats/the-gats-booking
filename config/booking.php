@@ -3,6 +3,16 @@
 return [
 
     /*
+     * Ten mien cua khu quan tri.
+     *
+     * PHAI doc qua config chu khong goi env() thang trong ma nguon: khi chay
+     * `php artisan config:cache` tren may that, env() ngoai thu muc config/
+     * luon tra ve null — khu quan tri se 404 tren dung ten mien cua no.
+     */
+    'admin_domain' => env('ADMIN_DOMAIN'),
+
+
+    /*
     |--------------------------------------------------------------------------
     | Kenh gui thong bao cho khach
     |--------------------------------------------------------------------------

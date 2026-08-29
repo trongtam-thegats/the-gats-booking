@@ -32,7 +32,7 @@ class SiteResolver
     /** Ten mien cua khu quan ly, khai bao o trang Cai dat hoac trong .env. */
     public function adminDomain(): ?string
     {
-        $domain = Setting::get('admin_domain', env('ADMIN_DOMAIN'));
+        $domain = Setting::get('admin_domain', config('booking.admin_domain'));
 
         return $domain ? strtolower(trim($domain)) : null;
     }
