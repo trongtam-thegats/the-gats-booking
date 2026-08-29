@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\RateLimiter;
+use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
@@ -18,6 +20,24 @@ class AuthController extends Controller
         return view('admin.login');
     }
 
+    /** Cho sai bao nhieu lan truoc khi khoa tam. */
+    protected const SO_LAN_TOI_DA = 5;
+
+    /** Khoa trong bao lau, tinh bang giay. */
+    protected const KHOA_GIAY = 900;
+
+    /**
+     * Khoa dem theo cap (email + dia chi IP).
+     *
+     * Khong dem theo mot minh email: nguoi ngoai chi can thu sai lien tuc mot
+     * dia chi la khoa duoc chinh chu ra ngoai. Cung khong dem theo mot minh IP:
+     * ca quan dung chung mot duong mang thi mot nguoi go sai se khoa het.
+     */
+    protected function khoaDem(Request $request): string
+    {
+        return 'dang-nhap|'.Str::lower((string) $request->input('email')).'|'.$request->ip();
+    }
+
     public function login(Request $request)
     {
         $data = $request->validate([
@@ -25,11 +45,26 @@ class AuthController extends Controller
             'password' => ['required', 'string'],
         ]);
 
+        $khoa = $this->khoaDem($request);
+
+        if (RateLimiter::tooManyAttempts($khoa, self::SO_LAN_TOI_DA)) {
+            $con = RateLimiter::availableIn($khoa);
+
+            throw ValidationException::withMessages([
+                'email' => 'Sai quá nhiều lần. Thử lại sau '
+                    .($con >= 60 ? ceil($con / 60).' phút.' : $con.' giây.'),
+            ]);
+        }
+
         if (! Auth::attempt($data, $request->boolean('remember'))) {
+            RateLimiter::hit($khoa, self::KHOA_GIAY);
+
             throw ValidationException::withMessages([
                 'email' => 'Email hoặc mật khẩu không đúng.',
             ]);
         }
+
+        RateLimiter::clear($khoa);
 
         if (! $request->user()->is_active) {
             Auth::logout();
