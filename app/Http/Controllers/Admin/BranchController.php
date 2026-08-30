@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Models\Branch;
 use App\Models\BranchClosure;
 use App\Models\Brand;
+use App\Models\Invoice;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
@@ -90,15 +91,32 @@ class BranchController extends AdminController
     {
         abort_unless($request->user()->isAdmin(), 403);
 
-        if ($branch->bookings()->exists()) {
+        // Xoa dia diem keo theo ca khu vuc, ban, lich nghi va toan bo lich su
+        // dat ban cua no. Hoa don thi khong bi xoa nhung mat lien ket dia diem
+        // nen bien mat khoi moi trang - mat ma khong ai hay, con te hon la xoa.
+        $vuong = [];
+
+        if ($so = $branch->bookings()->count()) {
+            $vuong[] = number_format($so).' lượt đặt bàn';
+        }
+
+        if ($so = Invoice::where('branch_id', $branch->id)->count()) {
+            $vuong[] = number_format($so).' hóa đơn';
+        }
+
+        if ($vuong) {
             return back()->withErrors([
-                'branch' => 'Chi nhánh đã có dữ liệu đặt bàn nên không xóa được. Hãy tắt trạng thái hoạt động thay vì xóa.',
+                'branch' => 'Không xóa được "'.$branch->name.'": đang có '.implode(' và ', $vuong)
+                    .'. Nếu chỉ muốn ngừng nhận khách, hãy tắt "Đang hoạt động" ở trên — '
+                    .'địa điểm sẽ biến mất khỏi trang đặt bàn nhưng dữ liệu cũ vẫn còn để tra cứu.',
             ]);
         }
 
+        $ten = $branch->name;
         $branch->delete();
 
-        return redirect()->route('admin.branches.index')->with('status', 'Đã xóa chi nhánh.');
+        return redirect()->route('admin.branches.index')
+            ->with('status', 'Đã xóa địa điểm '.$ten.' cùng khu vực và bàn của nó.');
     }
 
     public function storeClosure(Request $request, Branch $branch)

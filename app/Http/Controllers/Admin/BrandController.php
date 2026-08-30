@@ -2,7 +2,9 @@
 
 namespace App\Http\Controllers\Admin;
 
+use App\Models\Branch;
 use App\Models\Brand;
+use App\Models\GuestNote;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -18,7 +20,7 @@ class BrandController extends AdminController
             ->orderBy('name')
             ->get();
 
-        $orphanBranches = \App\Models\Branch::whereNull('brand_id')->orderBy('name')->get();
+        $orphanBranches = Branch::whereNull('brand_id')->orderBy('name')->get();
 
         return view('admin.brands.index', compact('brands', 'orphanBranches'));
     }
@@ -53,15 +55,30 @@ class BrandController extends AdminController
     {
         abort_unless($request->user()->isAdmin(), 403);
 
-        if ($brand->branches()->exists()) {
+        $vuong = [];
+
+        if ($so = $brand->branches()->count()) {
+            $vuong[] = number_format($so).' địa điểm';
+        }
+
+        // guest_notes gan theo quan va bi xoa theo, tuc la mat sach ghi chu ve
+        // khach lan danh dau "da xem xet" - phai bao truoc chu khong xoa lang.
+        if ($so = GuestNote::where('brand_id', $brand->id)->count()) {
+            $vuong[] = number_format($so).' ghi chú về khách';
+        }
+
+        if ($vuong) {
             return back()->withErrors([
-                'brand' => 'Quán này vẫn còn địa điểm. Hãy chuyển địa điểm sang quán khác trước khi xóa.',
+                'brand' => 'Không xóa được "'.$brand->name.'": đang có '.implode(' và ', $vuong)
+                    .'. Chuyển địa điểm sang quán khác trước, hoặc tắt "Đang hoạt động" nếu chỉ '
+                    .'muốn ngừng nhận đặt bàn.',
             ]);
         }
 
+        $ten = $brand->name;
         $brand->delete();
 
-        return back()->with('status', 'Đã xóa thương hiệu.');
+        return back()->with('status', 'Đã xóa quán '.$ten.'.');
     }
 
     /**
