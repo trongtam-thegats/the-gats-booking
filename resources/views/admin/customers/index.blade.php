@@ -106,32 +106,13 @@
         'rows' => $dongNhom->all(),
     ];
 
-    // --- Bieu do 2: doanh thu theo thang, tach khach nhan dien va vang lai --
-    $vizThang = [
-        'type' => 'area',
-        'label' => 'Doanh thu theo tháng',
-        'height' => 240,
-        // Doanh thu len den hang ti, truc phai rut gon thi moi doc duoc.
-        'unit' => 'tien',
-        'fields' => [
-            ['key' => 'value', 'label' => 'Doanh thu'],
-            ['key' => 'invoices', 'label' => 'Số hóa đơn'],
-            ['key' => 'identified', 'label' => 'Hóa đơn có khách'],
-        ],
-        'rows' => collect($theoThang)->map(fn ($m) => [
-            'label' => $m['label'],
-            'tipLabel' => 'Tháng '.Carbon::parse($m['month'].'-01')->format('m/Y'),
-            'value' => (int) round($m['revenue']),
-            'invoices' => number_format($m['invoices']),
-            'identified' => number_format($m['identified']),
-        ])->all(),
-    ];
-
     // --- Bieu do 3: khach moi va khach quay lai theo thang ------------------
     $vizKhachThang = [
-        'type' => 'stacked',
+        // Hai duong so nhau doc de hon cot chong: nhin ra ngay thang nao khach
+        // quay lai vuot len hay tut xuong so voi khach moi.
+        'type' => 'lines',
         'label' => 'Khách mới và khách quay lại theo tháng',
-        'height' => 220,
+        'height' => 250,
         'keys' => [
             ['key' => 'new_customers', 'label' => 'Khách mới', 'color' => 'good'],
             ['key' => 'returning', 'label' => 'Khách quay lại', 'color' => 'warning'],
@@ -371,34 +352,9 @@
     {{-- Bieu do. Di chuot vao cot de xem so lieu; nut chuyen sang bang so. --}}
     <div class="card">
         <div class="page-head" style="margin-bottom:6px">
-            <h2 style="margin:0">Doanh thu theo tháng <span class="muted" style="font-weight:400;font-size:13px">· toàn bộ kỳ dữ liệu</span></h2>
-            <button class="btn btn-ghost btn-sm" type="button" data-viz-toggle aria-pressed="false">Xem bảng số</button>
-        </div>
-
-        <figure class="viz-figure">
-            <div class="viz-plot"></div>
-            <script type="application/json">@json($vizThang)</script>
-            <div class="viz-table table-wrap">
-                <table>
-                    <thead><tr><th>Tháng</th><th class="num">Hóa đơn</th><th class="num">Có khách</th><th class="num">Doanh thu</th></tr></thead>
-                    <tbody>
-                    @foreach ($theoThang as $m)
-                        <tr>
-                            <td>{{ $m['label'] }}</td>
-                            <td class="num">{{ number_format($m['invoices']) }}</td>
-                            <td class="num">{{ number_format($m['identified']) }}</td>
-                            <td class="num">{{ number_format($m['revenue']) }}đ</td>
-                        </tr>
-                    @endforeach
-                    </tbody>
-                </table>
-            </div>
-        </figure>
-    </div>
-
-    <div class="card">
-        <div class="page-head" style="margin-bottom:6px">
-            <h2 style="margin:0">Khách mới và khách quay lại</h2>
+            <h2 style="margin:0">Khách mới và khách quay lại
+                <span class="muted" style="font-weight:400;font-size:13px">· toàn bộ kỳ dữ liệu</span>
+            </h2>
             <button class="btn btn-ghost btn-sm" type="button" data-viz-toggle aria-pressed="false">Xem bảng số</button>
         </div>
         <p class="muted small">

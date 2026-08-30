@@ -533,6 +533,24 @@ form.is-readonly input { pointer-events: none; opacity: .65; }
 .viz-legend span { display: inline-flex; align-items: center; gap: 6px; }
 .viz-legend i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
 
+/* Chu giai bam duoc cua bieu do duong: bam de tat bot tuyen cho de nhin. */
+.viz-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    background: none;
+    border: 0;
+    padding: 2px 0;
+    color: var(--text);
+    font: inherit;
+    font-size: 12.5px;
+    cursor: pointer;
+}
+
+.viz-legend-item:hover { color: var(--gold-soft); }
+.viz-legend-item[aria-pressed="false"] { opacity: .38; }
+.viz-legend-item[aria-pressed="false"] span { text-decoration: line-through; }
+
 /* --- Chu thich khi ro chuot --- */
 
 .viz-tip {

@@ -107,6 +107,188 @@
         };
     }
 
+    /* ---------- Bieu do duong nhieu tuyen: so hai xu huong voi nhau ---------- */
+
+    /**
+     * Ve nhieu duong tren cung mot truc.
+     *
+     * Khac bieu do vung o cho: dung de SO SANH hai day so, khong phai de nhin
+     * mot day so lon nho ra sao. Vi vay khong to nen duoi duong - to nen se
+     * lam duong nam duoi bi che khuat.
+     *
+     * Tuong tac: ra vao bang chuot thi co duong doc va mot cham tren moi tuyen,
+     * chu giai bam duoc de tat bot tuyen cho de nhin.
+     */
+    function drawLines(host, config) {
+        const rows = config.rows;
+        if (!rows.length) return empty(host);
+
+        const width = host.clientWidth || 640;
+        const height = config.height || 240;
+        const pad = { top: 16, right: 12, bottom: 26, left: 34 };
+        const plotW = Math.max(10, width - pad.left - pad.right);
+        const plotH = height - pad.top - pad.bottom;
+
+        // Tuyen nao dang bat. Tat het thi bat lai tuyen vua bam, khong de trong.
+        const dangBat = new Set(config.keys.map((k) => k.key));
+
+        const svg = el('svg', {
+            viewBox: `0 0 ${width} ${height}`, width: '100%', height,
+            role: 'img', 'aria-label': config.label,
+        }, host);
+
+        const lopLuoi = el('g', {}, svg);
+        const lopDuong = el('g', {}, svg);
+        const tip = makeTooltip(host);
+
+        const stepX = rows.length > 1 ? plotW / (rows.length - 1) : 0;
+        const xAt = (i) => pad.left + (rows.length > 1 ? i * stepX : plotW / 2);
+
+        let max = 1;
+        let yAt = (v) => pad.top + plotH;
+
+        // Cac cham theo con tro, moi tuyen mot cham.
+        const cham = {};
+        const marker = el('line', {
+            x1: pad.left, x2: pad.left, y1: pad.top, y2: pad.top + plotH,
+            stroke: palette.axis, 'stroke-width': 1, visibility: 'hidden',
+        }, svg);
+
+        function veLai() {
+            lopLuoi.textContent = '';
+            lopDuong.textContent = '';
+
+            const bat = config.keys.filter((k) => dangBat.has(k.key));
+            const dinh = Math.max(1, ...rows.flatMap((r) => bat.map((k) => Number(r[k.key]) || 0)));
+
+            max = niceMax(dinh);
+            yAt = (v) => pad.top + plotH - (v / max) * plotH;
+
+            ticks(max, 3).forEach((value) => {
+                const y = yAt(value);
+                el('line', {
+                    x1: pad.left, x2: width - pad.right, y1: y, y2: y,
+                    stroke: palette.grid, 'stroke-width': 1,
+                }, lopLuoi);
+                el('text', { x: 4, y: y + 4, fill: palette.muted, 'font-size': 11 }, lopLuoi)
+                    .textContent = gonSo(value, config.unit);
+            });
+
+            labelXAxis(lopLuoi, rows, xAt, pad.top + plotH + 16);
+
+            bat.forEach((key) => {
+                const mau = palette[key.color] || key.color || palette.series;
+                const d = rows
+                    .map((r, i) => `${i === 0 ? 'M' : 'L'}${xAt(i)},${yAt(Number(r[key.key]) || 0)}`)
+                    .join(' ');
+
+                el('path', {
+                    d, fill: 'none', stroke: mau, 'stroke-width': 2,
+                    'stroke-linejoin': 'round', 'stroke-linecap': 'round',
+                }, lopDuong);
+
+                // Moc tron o tung thang, giup dem duoc so diem khi duong phang.
+                if (rows.length <= 20) {
+                    rows.forEach((r, i) => {
+                        el('circle', {
+                            cx: xAt(i), cy: yAt(Number(r[key.key]) || 0), r: 2.5,
+                            fill: palette.surface, stroke: mau, 'stroke-width': 1.5,
+                        }, lopDuong);
+                    });
+                }
+            });
+
+            // Cham theo con tro phai ve lai sau khi doi tuyen dang bat.
+            config.keys.forEach((key) => {
+                if (cham[key.key]) cham[key.key].remove();
+
+                cham[key.key] = el('circle', {
+                    cx: pad.left, cy: pad.top + plotH, r: 4.5,
+                    fill: palette[key.color] || key.color || palette.series,
+                    stroke: palette.surface, 'stroke-width': 2, visibility: 'hidden',
+                }, svg);
+            });
+        }
+
+        veLai();
+
+        function gan(event) {
+            const box = svg.getBoundingClientRect();
+            const x = (event.clientX - box.left) * (width / box.width);
+            const i = rows.length > 1 ? Math.round((x - pad.left) / stepX) : 0;
+
+            return Math.max(0, Math.min(rows.length - 1, i));
+        }
+
+        svg.addEventListener('pointermove', (event) => {
+            const i = gan(event);
+            const x = xAt(i);
+
+            marker.setAttribute('x1', x);
+            marker.setAttribute('x2', x);
+            marker.setAttribute('visibility', 'visible');
+            marker.setAttribute('opacity', 0.5);
+
+            let cao = pad.top + plotH;
+
+            config.keys.forEach((key) => {
+                const c = cham[key.key];
+
+                if (! dangBat.has(key.key)) {
+                    c.setAttribute('visibility', 'hidden');
+
+                    return;
+                }
+
+                const y = yAt(Number(rows[i][key.key]) || 0);
+                c.setAttribute('cx', x);
+                c.setAttribute('cy', y);
+                c.setAttribute('visibility', 'visible');
+                cao = Math.min(cao, y);
+            });
+
+            const box = svg.getBoundingClientRect();
+            tip.show(config.tip(rows[i]), x * (box.width / width), cao * (box.height / height));
+        });
+
+        svg.addEventListener('pointerleave', () => {
+            marker.setAttribute('visibility', 'hidden');
+            Object.values(cham).forEach((c) => c.setAttribute('visibility', 'hidden'));
+            tip.hide();
+        });
+
+        veChuGiai(host, config, dangBat, veLai);
+    }
+
+    /** Chu giai bam duoc de tat/bat tung tuyen. */
+    function veChuGiai(host, config, dangBat, veLai) {
+        const box = document.createElement('div');
+        box.className = 'viz-legend';
+
+        config.keys.forEach((key) => {
+            const nut = document.createElement('button');
+            nut.type = 'button';
+            nut.className = 'viz-legend-item';
+            nut.setAttribute('aria-pressed', 'true');
+            nut.innerHTML = '<i style="background:'
+                + (palette[key.color] || key.color || palette.series) + '"></i><span></span>';
+            nut.querySelector('span').textContent = key.label;
+
+            nut.addEventListener('click', () => {
+                // Khong cho tat tuyen cuoi cung: bieu do trong khong noi len gi.
+                if (dangBat.has(key.key) && dangBat.size === 1) return;
+
+                dangBat.has(key.key) ? dangBat.delete(key.key) : dangBat.add(key.key);
+                nut.setAttribute('aria-pressed', dangBat.has(key.key) ? 'true' : 'false');
+                veLai();
+            });
+
+            box.appendChild(nut);
+        });
+
+        host.appendChild(box);
+    }
+
     /* ---------- Bieu do duong / vung: xu huong theo thoi gian ---------- */
 
     function drawArea(host, config) {
@@ -436,7 +618,9 @@
             keys: (config.keys || []).map((k) => ({ ...k, color: palette[k.color] || k.color })),
         };
 
-        if (config.type === 'area') {
+        if (config.type === 'lines') {
+            drawLines(host, { ...shared, tip: (r) => tipHtml(config, r) });
+        } else if (config.type === 'area') {
             drawArea(host, { ...shared, tip: (r) => tipHtml(config, r) });
         } else if (config.type === 'columns') {
             drawColumns(host, { ...shared, tip: (r) => tipHtml(config, r) });

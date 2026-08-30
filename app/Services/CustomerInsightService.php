@@ -380,12 +380,13 @@ class CustomerInsightService
     }
 
     /**
-     * So lieu theo tung thang de ve bieu do.
+     * Khach moi va khach quay lai theo tung thang, de ve bieu do giu chan khach.
      *
      * Gom trong PHP chu khong dung ham ngay thang cua MySQL, giong ReportService.
+     * Doanh thu theo thang thuoc trang Bao cao, khong tinh o day.
      *
      * @param  array<int>|null  $branchIds
-     * @return array<int, array<string, mixed>>
+     * @return array<int, array{label: string, month: string, new_customers: int, returning: int}>
      */
     public function theoThang(?array $branchIds, int $soThang = 18): array
     {
@@ -394,9 +395,10 @@ class CustomerInsightService
         $hoaDon = Invoice::query()
             ->choDiaDiem($branchIds)
             ->thanhCong()
+            ->coKhach()
             ->where('paid_at', '>=', $moc)
             ->orderBy('paid_at')
-            ->get(['paid_at', 'total', 'customer_phone']);
+            ->get(['paid_at', 'customer_phone']);
 
         // Lan ghe dau tien cua tung khach, tinh tren toan bo lich su chu khong
         // chi trong khoang dang xem - neu khong thi khach cu se bi goi la moi.
@@ -413,23 +415,11 @@ class CustomerInsightService
             $thang[$khoa] ??= [
                 'label' => $hd->paid_at->format('m/y'),
                 'month' => $khoa,
-                'invoices' => 0,
-                'revenue' => 0.0,
-                'identified' => 0,
                 'new_customers' => [],
                 'returning' => [],
             ];
 
-            $thang[$khoa]['invoices']++;
-            $thang[$khoa]['revenue'] += (float) $hd->total;
-
             $sdt = (string) $hd->customer_phone;
-
-            if ($sdt === '') {
-                continue;
-            }
-
-            $thang[$khoa]['identified']++;
 
             if (($lanDau[$sdt] ?? null) === $khoa) {
                 $thang[$khoa]['new_customers'][$sdt] = true;
@@ -443,10 +433,6 @@ class CustomerInsightService
         return array_values(array_map(fn (array $t) => [
             'label' => $t['label'],
             'month' => $t['month'],
-            'invoices' => $t['invoices'],
-            'revenue' => $t['revenue'],
-            'identified' => $t['identified'],
-            'anonymous' => $t['invoices'] - $t['identified'],
             'new_customers' => count($t['new_customers']),
             'returning' => count($t['returning']),
         ], $thang));
