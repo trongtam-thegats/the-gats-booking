@@ -5,10 +5,12 @@ use App\Http\Controllers\Admin\BookingController as AdminBookingController;
 use App\Http\Controllers\Admin\BranchController;
 use App\Http\Controllers\Admin\BrandController;
 use App\Http\Controllers\Admin\ContentController;
+use App\Http\Controllers\Admin\CustomerInsightController;
 use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\DiningTableController;
 use App\Http\Controllers\Admin\FloorController;
 use App\Http\Controllers\Admin\GuestController;
+use App\Http\Controllers\Admin\InvoiceController;
 use App\Http\Controllers\Admin\PasswordController;
 use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\SettingController;
@@ -47,6 +49,12 @@ Route::prefix('quan-ly')->name('admin.')->middleware('admin.site')->group(functi
         Route::get('dat-ban/{booking}', [AdminBookingController::class, 'show'])->name('bookings.show');
         Route::get('khach', [GuestController::class, 'index'])->name('guests.index');
         Route::get('bao-cao', [ReportController::class, 'index'])->name('reports.index');
+
+        // Du lieu ban hang nhap tu POS. Chi doc, moi vai deu xem duoc.
+        Route::get('hoa-don', [InvoiceController::class, 'index'])->name('invoices.index');
+        Route::get('khach-hang', [CustomerInsightController::class, 'index'])->name('customers.index');
+        Route::get('khach-hang/{phone}', [CustomerInsightController::class, 'show'])
+            ->where('phone', '[0-9+]+')->name('customers.show');
 
         // Xu ly dat ban - quan tri va quan ly
         Route::middleware('role:admin,manager')->group(function () {
@@ -88,6 +96,9 @@ Route::prefix('quan-ly')->name('admin.')->middleware('admin.site')->group(functi
             Route::post('quan', [BrandController::class, 'store'])->name('brands.store');
             Route::put('quan/{brand}', [BrandController::class, 'update'])->name('brands.update');
             Route::delete('quan/{brand}', [BrandController::class, 'destroy'])->name('brands.destroy');
+
+            // Tai tep xuat tu POS len de nhap, thay cho viec goi lenh tren may chu.
+            Route::post('hoa-don/nhap', [InvoiceController::class, 'import'])->name('invoices.import');
 
             Route::get('cai-dat', [SettingController::class, 'index'])->name('settings.index');
             Route::put('cai-dat', [SettingController::class, 'update'])->name('settings.update');

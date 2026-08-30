@@ -8,6 +8,7 @@ use App\Models\Brand;
 use App\Models\DiningTable;
 use App\Models\User;
 use App\Services\AvailabilityService;
+use App\Support\SoDienThoai;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -231,7 +232,7 @@ class NhapDatBanNightify extends Command
             'code' => trim((string) $r['RESERVATION_CODE']),
             'branch_id' => $branch->id,
             'customer_name' => trim((string) $r['CUSTOMER_NAME']) ?: 'Khách',
-            'customer_phone' => $this->soDienThoai((string) $r['CUSTOMER_PHONE']),
+            'customer_phone' => SoDienThoai::chuan((string) $r['CUSTOMER_PHONE']),
             'customer_email' => filter_var(trim((string) $r['CUSTOMER_EMAIL']), FILTER_VALIDATE_EMAIL) ?: null,
             'party_size' => max(1, (int) $r['PAX']),
             'booking_date' => $ngay,
@@ -251,28 +252,6 @@ class NhapDatBanNightify extends Command
             'created_at' => $taoLuc,
             'updated_at' => $taoLuc,
         ];
-    }
-
-    /**
-     * So dien thoai Nightify ghi dang "+84 354374027".
-     *
-     * So Viet Nam dua ve dang 0xxx cho khop voi cach nhan vien quen nhin va
-     * cho tra cuu khach khop duoc; so nuoc ngoai giu nguyen ma quoc gia.
-     */
-    protected function soDienThoai(string $so): string
-    {
-        $so = trim($so);
-        $chiSo = preg_replace('/[^0-9]/', '', $so) ?? '';
-
-        if ($chiSo === '') {
-            return '';
-        }
-
-        if (str_starts_with($chiSo, '84')) {
-            return '0'.substr($chiSo, 2);
-        }
-
-        return str_starts_with($so, '+') ? '+'.$chiSo : $chiSo;
     }
 
     /**
