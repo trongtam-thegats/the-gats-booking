@@ -3,6 +3,7 @@
 @section('title', $ho['name'] ?: $ho['phone'])
 
 @php
+    use App\Models\GuestNote;
     use App\Services\CustomerInsightService as Insight;
     use Illuminate\Support\Str;
 
@@ -18,10 +19,22 @@
         'mot_lan' => 'status-completed',
     ];
 
+    $ghiChu = $ho['note'] ?? null;
+    $mauXemXet = [
+        'chua_xem_xet' => 'status-pending',
+        'da_xem_xet' => 'status-completed',
+        'da_ghe_lai' => 'status-confirmed',
+    ];
+
     /** Nhung dieu dang luu y, sinh tu chinh so lieu chu khong phai viet tay. */
     $luuY = [];
 
-    if ($co['segment'] === 'nguy_co' && $co['visits'] >= 2) {
+    if ($ho['review'] === 'da_ghe_lai' && $ghiChu?->reviewed_at) {
+        $luuY[] = ['good', 'Đã ghé lại sau khi được xem xét ngày '
+            .$ghiChu->reviewed_at->format('d/m/Y').'. Không cần chăm sóc nữa.'];
+    }
+
+    if ($co['segment'] === 'nguy_co' && $co['visits'] >= 2 && $ho['review'] !== 'da_ghe_lai') {
         $luuY[] = ['warn', 'Khách quen thường ghé mỗi '.$co['cadence'].' ngày nhưng đã '
             .$co['days_since'].' ngày không thấy. Đáng gọi hỏi thăm.'];
     }
@@ -79,6 +92,20 @@
             <small class="muted">vắng {{ $co['days_since'] ?? '—' }} ngày</small>
         </div>
         <div class="stat">
+            <span>Xem xét</span>
+            <b style="font-size:19px">
+                <span class="pill {{ $mauXemXet[$ho['review']] }}">{{ Insight::XEM_XET[$ho['review']] }}</span>
+            </b>
+            <small class="muted">
+                @if ($ghiChu?->reviewed_at)
+                    {{ $ghiChu->reviewed_at->format('d/m/Y') }}
+                    @if ($ghiChu->reviewedBy) · {{ $ghiChu->reviewedBy->name }} @endif
+                @else
+                    chưa ai xem xét
+                @endif
+            </small>
+        </div>
+        <div class="stat">
             <span>Tình trạng</span>
             <b style="font-size:19px">
                 <span class="pill {{ $mauTinhTrang[$co['segment']] ?? '' }}">{{ Insight::TINH_TRANG[$co['segment']] }}</span>
@@ -90,6 +117,52 @@
             </small>
         </div>
     </div>
+
+    @if (auth()->user()->canWrite())
+        <div class="card">
+            <h2>Đánh dấu đã xem xét</h2>
+            <p class="muted small">
+                Đánh dấu để khách này không hiện lại trong danh sách cần chăm sóc.
+                <b>Khách ghé lại lần nữa thì hệ thống tự chuyển sang “Đã ghé lại”</b> — không ai phải vào gỡ tay.
+            </p>
+
+            @if ($ghiChu?->review_note)
+                <p class="hint" style="margin:0 0 12px">Ghi chú lần trước: {{ $ghiChu->review_note }}</p>
+            @endif
+
+            <form method="post" action="{{ route('admin.customers.review', $ho['phone']) }}" class="form-grid">
+                @csrf
+                <div class="field">
+                    <label for="review_outcome">Kết quả <span class="muted">(có thể bỏ trống)</span></label>
+                    <select id="review_outcome" name="review_outcome">
+                        <option value="">— Chỉ đánh dấu đã xem —</option>
+                        @foreach (GuestNote::KET_QUA as $ma => $nhan)
+                            <option value="{{ $ma }}" @selected($ghiChu?->review_outcome === $ma)>{{ $nhan }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="review_note">Ghi chú <span class="muted">(có thể bỏ trống)</span></label>
+                    <input type="text" id="review_note" name="review_note" maxlength="500"
+                           value="{{ $ghiChu?->review_note }}" placeholder="Đã gọi, khách bận đi công tác">
+                </div>
+                <div class="field full">
+                    <button class="btn" type="submit">
+                        {{ $ghiChu?->reviewed_at ? 'Cập nhật đánh dấu' : 'Đánh dấu đã xem xét' }}
+                    </button>
+                </div>
+            </form>
+
+            @if ($ghiChu?->reviewed_at)
+                <form method="post" action="{{ route('admin.customers.review', $ho['phone']) }}"
+                      onsubmit="return confirm('Bỏ đánh dấu, đưa khách này trở lại danh sách chưa xem xét?')">
+                    @csrf
+                    <input type="hidden" name="bo_danh_dau" value="1">
+                    <button class="btn btn-ghost btn-sm" type="submit">Bỏ đánh dấu</button>
+                </form>
+            @endif
+        </div>
+    @endif
 
     <div class="card">
         <h2>Thói quen</h2>

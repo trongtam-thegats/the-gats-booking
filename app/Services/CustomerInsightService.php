@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Models\Booking;
+use App\Models\Branch;
+use App\Models\GuestNote;
 use App\Models\Invoice;
 use App\Models\PosCustomer;
 use Illuminate\Support\Carbon;
@@ -30,6 +32,21 @@ class CustomerInsightService
         'nguy_co' => 'Nguy cơ rời bỏ',
         'mot_lan' => 'Mới ghé một lần',
         'khach_moi' => 'Khách mới',
+    ];
+
+    /**
+     * Trang thai xem xet cua mot khach.
+     *
+     * "Da ghe lai" khong ai bam tay ca - he thong so lan ghe gan nhat voi thoi
+     * diem danh dau de tu suy ra. Nho vay nhan khong bao gio muc: khach quay
+     * lai la tu roi khoi danh sach can cham soc.
+     *
+     * @var array<string, string>
+     */
+    public const XEM_XET = [
+        'chua_xem_xet' => 'Chưa xem xét',
+        'da_xem_xet' => 'Đã xem xét',
+        'da_ghe_lai' => 'Đã ghé lại',
     ];
 
     /**
@@ -71,7 +88,25 @@ class CustomerInsightService
      * @param  array<int>|null  $branchIds
      * @return Collection<int, array<string, mixed>>
      */
-    public function ranking(?array $branchIds, string $sapXep = 'spend', int $gioiHan = 100): Collection
+    public function ranking(
+        ?array $branchIds,
+        string $sapXep = 'spend',
+        int $gioiHan = 100,
+        array $loc = [],
+    ): Collection {
+        return $this->locVaXep($this->tatCaKhach($branchIds), $sapXep, $loc)->take($gioiHan);
+    }
+
+    /**
+     * Moi khach da nhan dien duoc, kem chi so va trang thai - chua loc, chua xep.
+     *
+     * Tach rieng de trang co the vua dem tong theo tung nhom, vua hien mot phan
+     * da loc, ma chi phai tinh mot lan.
+     *
+     * @param  array<int>|null  $branchIds
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function tatCaKhach(?array $branchIds): Collection
     {
         $khach = $this->tongHopHoaDon($branchIds);
 
@@ -82,23 +117,148 @@ class CustomerInsightService
         $sdt = $khach->keys()->all();
         $datBan = $this->tongHopDatBan($sdt, $branchIds);
         $the = PosCustomer::whereIn('phone', $sdt)->get()->keyBy('phone');
+        $ghiChu = $this->ghiChuKhach($sdt, $branchIds);
 
         return $khach
-            ->map(function (array $k) use ($datBan, $the) {
+            ->map(function (array $k) use ($datBan, $the, $ghiChu) {
                 $k += $this->nhipGhe($k);
                 $k['booking'] = $datBan[$k['phone']] ?? null;
                 $k['card'] = $the[$k['phone']] ?? null;
+                $k['note'] = $ghiChu[$k['phone']] ?? null;
+                $k['review'] = $this->trangThaiXemXet($k['note'], $k['last_at'], $k['booking']);
 
                 return $k;
             })
+            ->values();
+    }
+
+    /**
+     * @param  Collection<int, array<string, mixed>>  $khach
+     * @param  array<string, mixed>  $loc
+     * @return Collection<int, array<string, mixed>>
+     */
+    public function locVaXep(Collection $khach, string $sapXep, array $loc = []): Collection
+    {
+        return $khach
+            ->filter(fn (array $k) => $this->hopLoc($k, $loc))
             ->sortByDesc(fn (array $k) => match ($sapXep) {
                 'visits' => [$k['visits'], $k['spend']],
                 'recent' => [$k['last_at']?->getTimestamp() ?? 0, $k['spend']],
                 'risk' => [$k['visits'] >= 2 && $k['segment'] === 'nguy_co' ? 1 : 0, $k['spend']],
+                'avg' => [$k['avg'], $k['visits']],
+                'vang' => [$k['days_since'] ?? -1, $k['spend']],
                 default => [$k['spend'], $k['visits']],
             })
-            ->take($gioiHan)
             ->values();
+    }
+
+    /**
+     * @param  array<string, mixed>  $k
+     * @param  array<string, mixed>  $loc
+     */
+    protected function hopLoc(array $k, array $loc): bool
+    {
+        if (! empty($loc['segment']) && ! in_array($k['segment'], (array) $loc['segment'], true)) {
+            return false;
+        }
+
+        if (! empty($loc['review']) && ! in_array($k['review'], (array) $loc['review'], true)) {
+            return false;
+        }
+
+        if (! empty($loc['tier'])) {
+            $hang = $k['card']?->tier ?: '(không hạng)';
+
+            if (! in_array($hang, (array) $loc['tier'], true)) {
+                return false;
+            }
+        }
+
+        if (isset($loc['visits_min']) && $k['visits'] < (int) $loc['visits_min']) {
+            return false;
+        }
+
+        if (isset($loc['spend_min']) && $k['spend'] < (float) $loc['spend_min']) {
+            return false;
+        }
+
+        if (isset($loc['vang_min']) && ($k['days_since'] ?? 0) < (int) $loc['vang_min']) {
+            return false;
+        }
+
+        if (! empty($loc['co_dat_ban']) && ! $k['booking']) {
+            return false;
+        }
+
+        if (! empty($loc['co_vang_mat']) && (int) ($k['booking']['no_show'] ?? 0) < 1) {
+            return false;
+        }
+
+        if (! empty($loc['tim'])) {
+            $tim = mb_strtolower(trim((string) $loc['tim']));
+            $trong = mb_strtolower(($k['name'] ?? '').' '.$k['phone']);
+
+            if ($tim !== '' && ! str_contains($trong, $tim)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Ghi chu cua quan ve khach, tra cuu duoc theo so dien thoai.
+     *
+     * Ghi chu gan theo tung quan; khi dang xem ca chuoi thi lay ban duoc xem
+     * xet gan nhat de khong bao mot khach "chua xem xet" trong khi quan khac
+     * da xem roi.
+     *
+     * @param  array<int, string>  $sdt
+     * @param  array<int>|null  $branchIds
+     * @return Collection<string, GuestNote>
+     */
+    protected function ghiChuKhach(array $sdt, ?array $branchIds): Collection
+    {
+        $brandIds = Branch::query()
+            ->when($branchIds !== null, fn ($q) => $q->whereIn('id', $branchIds ?: [0]))
+            ->pluck('brand_id')
+            ->filter()
+            ->unique()
+            ->all();
+
+        return GuestNote::whereIn('phone', $sdt)
+            ->when($brandIds, fn ($q) => $q->whereIn('brand_id', $brandIds))
+            ->orderByRaw('reviewed_at is null')
+            ->orderByDesc('reviewed_at')
+            ->get()
+            ->unique('phone')
+            ->keyBy('phone');
+    }
+
+    /**
+     * Khach da duoc xem xet chua, va da quay lai sau khi xem xet chua.
+     *
+     * @param  array<string, mixed>|null  $datBan
+     */
+    protected function trangThaiXemXet(?GuestNote $ghiChu, ?Carbon $lanCuoi, ?array $datBan): string
+    {
+        if (! $ghiChu?->reviewed_at) {
+            return 'chua_xem_xet';
+        }
+
+        // Co hoa don moi sau khi danh dau thi khach da quay lai.
+        if ($lanCuoi && $lanCuoi->gt($ghiChu->reviewed_at)) {
+            return 'da_ghe_lai';
+        }
+
+        // Chua co hoa don moi nhung da dat ban lai cung tinh la quay lai.
+        $ngayDat = $datBan['last_date'] ?? null;
+
+        if ($ngayDat && Carbon::parse($ngayDat)->endOfDay()->gt($ghiChu->reviewed_at)) {
+            return 'da_ghe_lai';
+        }
+
+        return 'da_xem_xet';
     }
 
     /**
@@ -130,16 +290,127 @@ class CustomerInsightService
         $co = $this->chiSoHoaDon($dung, $phone, $hoaDon->firstWhere('customer_name', '!=', null)?->customer_name);
         $co += $this->nhipGhe($co);
 
+        $datBan = $this->chiSoDatBan($don);
+        $ghiChu = $this->ghiChuKhach([$phone], $branchIds)->get($phone);
+
         return [
             'phone' => $phone,
             'name' => $co['name'],
             'card' => PosCustomer::where('phone', $phone)->first(),
+            'note' => $ghiChu,
+            'review' => $this->trangThaiXemXet($ghiChu, $co['last_at'], [
+                'last_date' => $don->max('booking_date'),
+            ]),
             'stats' => $co,
             'habits' => $this->thoiQuen($dung),
             'invoices' => $hoaDon,
             'bookings' => $don,
-            'booking_stats' => $this->chiSoDatBan($don),
+            'booking_stats' => $datBan,
         ];
+    }
+
+    /**
+     * So lieu theo tung thang de ve bieu do.
+     *
+     * Gom trong PHP chu khong dung ham ngay thang cua MySQL, giong ReportService.
+     *
+     * @param  array<int>|null  $branchIds
+     * @return array<int, array<string, mixed>>
+     */
+    public function theoThang(?array $branchIds, int $soThang = 18): array
+    {
+        $moc = now()->startOfMonth()->subMonths($soThang - 1);
+
+        $hoaDon = Invoice::query()
+            ->choDiaDiem($branchIds)
+            ->thanhCong()
+            ->where('paid_at', '>=', $moc)
+            ->orderBy('paid_at')
+            ->get(['paid_at', 'total', 'customer_phone']);
+
+        // Lan ghe dau tien cua tung khach, tinh tren toan bo lich su chu khong
+        // chi trong khoang dang xem - neu khong thi khach cu se bi goi la moi.
+        $lanDau = $this->tongHopHoaDon($branchIds)->map(fn ($k) => $k['first_at']?->format('Y-m'));
+
+        $thang = [];
+
+        foreach ($hoaDon as $hd) {
+            if (! $hd->paid_at) {
+                continue;
+            }
+
+            $khoa = $hd->paid_at->format('Y-m');
+            $thang[$khoa] ??= [
+                'label' => $hd->paid_at->format('m/y'),
+                'month' => $khoa,
+                'invoices' => 0,
+                'revenue' => 0.0,
+                'identified' => 0,
+                'new_customers' => [],
+                'returning' => [],
+            ];
+
+            $thang[$khoa]['invoices']++;
+            $thang[$khoa]['revenue'] += (float) $hd->total;
+
+            $sdt = (string) $hd->customer_phone;
+
+            if ($sdt === '') {
+                continue;
+            }
+
+            $thang[$khoa]['identified']++;
+
+            if (($lanDau[$sdt] ?? null) === $khoa) {
+                $thang[$khoa]['new_customers'][$sdt] = true;
+            } else {
+                $thang[$khoa]['returning'][$sdt] = true;
+            }
+        }
+
+        ksort($thang);
+
+        return array_values(array_map(fn (array $t) => [
+            'label' => $t['label'],
+            'month' => $t['month'],
+            'invoices' => $t['invoices'],
+            'revenue' => $t['revenue'],
+            'identified' => $t['identified'],
+            'anonymous' => $t['invoices'] - $t['identified'],
+            'new_customers' => count($t['new_customers']),
+            'returning' => count($t['returning']),
+        ], $thang));
+    }
+
+    /**
+     * Phan bo khach theo so lan ghe.
+     *
+     * @param  Collection<int, array<string, mixed>>  $khach
+     * @return array<int, array{label: string, value: int, spend: float}>
+     */
+    public function theoSoLanGhe(Collection $khach): array
+    {
+        $bac = [
+            '1 lần' => fn (int $n) => $n === 1,
+            '2–4 lần' => fn (int $n) => $n >= 2 && $n <= 4,
+            '5–9 lần' => fn (int $n) => $n >= 5 && $n <= 9,
+            '10–19 lần' => fn (int $n) => $n >= 10 && $n <= 19,
+            'Từ 20 lần' => fn (int $n) => $n >= 20,
+        ];
+
+        $ket = [];
+
+        foreach ($bac as $nhan => $hop) {
+            $nhom = $khach->filter(fn (array $k) => $hop((int) $k['visits']));
+
+            $ket[] = [
+                'label' => $nhan,
+                'value' => $nhom->count(),
+                'spend' => (float) $nhom->sum('spend'),
+            ];
+        }
+
+        return $ket;
     }
 
     /**

@@ -57,6 +57,25 @@
         return 10 * magnitude;
     }
 
+    // Rut gon con so dai cho truc va nhan tren cot. Tien Viet len den hang ti
+    // nen de nguyen thi truc chi toan chu so, khong ai doc noi.
+    function gonSo(value, kieu) {
+        const n = Number(value) || 0;
+
+        if (kieu !== 'tien' && Math.abs(n) < 10000) return String(n);
+
+        const abs = Math.abs(n);
+        if (abs >= 1e9) return trimSo(n / 1e9) + ' tỉ';
+        if (abs >= 1e6) return trimSo(n / 1e6) + ' tr';
+        if (abs >= 1e3) return trimSo(n / 1e3) + 'k';
+
+        return String(n);
+    }
+
+    function trimSo(n) {
+        return (Math.round(n * 10) / 10).toString().replace('.', ',');
+    }
+
     function ticks(max, count) {
         const out = [];
         for (let i = 0; i <= count; i++) out.push(Math.round((max / count) * i));
@@ -113,7 +132,7 @@
         ticks(max, 3).forEach((value) => {
             const y = yAt(value);
             el('line', { x1: pad.left, x2: width - pad.right, y1: y, y2: y, stroke: palette.grid, 'stroke-width': 1 }, svg);
-            el('text', { x: 4, y: y + 4, fill: palette.muted, 'font-size': 11 }, svg).textContent = value;
+            el('text', { x: 4, y: y + 4, fill: palette.muted, 'font-size': 11 }, svg).textContent = gonSo(value, config.unit);
         });
 
         // Vung to nhat duoi duong, dam o tren nhat dan xuong duoi.
@@ -138,7 +157,7 @@
             el('text', {
                 x: xAt(peak), y: Math.max(12, yAt(rows[peak].value) - 10),
                 fill: palette.text, 'font-size': 11, 'font-weight': 600, 'text-anchor': anchor,
-            }, svg).textContent = rows[peak].value;
+            }, svg).textContent = gonSo(rows[peak].value, config.unit);
         }
 
         labelXAxis(svg, rows, xAt, pad.top + plotH + 16);
@@ -208,7 +227,7 @@
         ticks(max, 2).forEach((value) => {
             const y = pad.top + plotH - (value / max) * plotH;
             el('line', { x1: pad.left, x2: width - pad.right, y1: y, y2: y, stroke: palette.grid, 'stroke-width': 1 }, svg);
-            el('text', { x: 2, y: y + 4, fill: palette.muted, 'font-size': 11 }, svg).textContent = value;
+            el('text', { x: 2, y: y + 4, fill: palette.muted, 'font-size': 11 }, svg).textContent = gonSo(value, config.unit);
         });
 
         // Cot cao nhat duoc lam noi len, con lai cung mot mau diu hon.
@@ -232,7 +251,7 @@
                 el('text', {
                     x: x + barW / 2, y: Math.max(11, y - 6),
                     fill: palette.text, 'font-size': 11, 'font-weight': 600, 'text-anchor': 'middle',
-                }, svg).textContent = row.value;
+                }, svg).textContent = gonSo(row.value, config.unit);
             }
 
             // Vung bam trong suot phu ca o, de ngon tay khong phai nham dung cot.
@@ -283,7 +302,7 @@
         ticks(max, 2).forEach((value) => {
             const y = pad.top + plotH - (value / max) * plotH;
             el('line', { x1: pad.left, x2: width - pad.right, y1: y, y2: y, stroke: palette.grid, 'stroke-width': 1 }, svg);
-            el('text', { x: 2, y: y + 4, fill: palette.muted, 'font-size': 11 }, svg).textContent = value;
+            el('text', { x: 2, y: y + 4, fill: palette.muted, 'font-size': 11 }, svg).textContent = gonSo(value, config.unit);
         });
 
         rows.forEach((row, i) => {

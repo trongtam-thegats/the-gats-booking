@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Models\Booking;
 use App\Models\Branch;
 use App\Models\Brand;
+use App\Models\GuestNote;
 use App\Models\Invoice;
 use App\Models\PosCustomer;
 use App\Models\User;
@@ -185,6 +186,142 @@ class PhanTichKhachHangTest extends TestCase
                 'tep' => UploadedFile::fake()->create('bao-cao.csv', 10, 'text/csv'),
             ])
             ->assertSessionHasErrors('tep');
+    }
+
+    public function test_danh_dau_da_xem_xet_roi_thi_khach_ra_khoi_nhom_chua_xem_xet(): void
+    {
+        $this->hoaDon('0900000010', now()->subDays(90)->toDateTimeString(), 500000);
+        $this->hoaDon('0900000010', now()->subDays(60)->toDateTimeString(), 500000);
+
+        $s = app(CustomerInsightService::class);
+
+        $this->assertSame('chua_xem_xet', $s->tatCaKhach(null)->firstWhere('phone', '0900000010')['review']);
+
+        $this->actingAs($this->admin)
+            ->post('/quan-ly/khach-hang/0900000010/danh-dau', ['review_outcome' => 'da_lien_he'])
+            ->assertRedirect();
+
+        $this->assertSame('da_xem_xet', $s->tatCaKhach(null)->firstWhere('phone', '0900000010')['review']);
+
+        $ghiChu = GuestNote::where('phone', '0900000010')->firstOrFail();
+        $this->assertSame('da_lien_he', $ghiChu->review_outcome);
+        $this->assertSame($this->admin->id, $ghiChu->reviewed_by);
+    }
+
+    public function test_khach_ghe_lai_sau_khi_danh_dau_thi_he_thong_tu_chuyen_nhan(): void
+    {
+        $this->hoaDon('0900000011', now()->subDays(90)->toDateTimeString(), 500000);
+
+        $this->actingAs($this->admin)
+            ->post('/quan-ly/khach-hang/0900000011/danh-dau')
+            ->assertRedirect();
+
+        $s = app(CustomerInsightService::class);
+        $this->assertSame('da_xem_xet', $s->tatCaKhach(null)->firstWhere('phone', '0900000011')['review']);
+
+        // Vai ngay sau khach quay lai - khong ai bam gi ca, nhan phai tu doi.
+        $this->travel(3)->days();
+        $this->hoaDon('0900000011', now()->toDateTimeString(), 700000);
+
+        $this->assertSame('da_ghe_lai', $s->tatCaKhach(null)->firstWhere('phone', '0900000011')['review']);
+    }
+
+    public function test_dat_ban_lai_cung_duoc_tinh_la_da_ghe_lai(): void
+    {
+        $this->hoaDon('0900000012', now()->subDays(90)->toDateTimeString(), 500000);
+
+        $this->actingAs($this->admin)->post('/quan-ly/khach-hang/0900000012/danh-dau')->assertRedirect();
+
+        $this->travel(3)->days();
+
+        Booking::create([
+            'code' => 'GHE001', 'branch_id' => $this->branch->id,
+            'customer_name' => 'Khách 012', 'customer_phone' => '0900000012',
+            'party_size' => 2, 'booking_date' => now()->toDateString(),
+            'start_time' => '19:00', 'end_time' => '21:00',
+            'status' => Booking::STATUS_CONFIRMED, 'source' => 'phone',
+        ]);
+
+        $this->assertSame(
+            'da_ghe_lai',
+            app(CustomerInsightService::class)->tatCaKhach(null)->firstWhere('phone', '0900000012')['review']
+        );
+    }
+
+    public function test_bo_danh_dau_dua_khach_ve_lai_nhom_chua_xem_xet(): void
+    {
+        $this->hoaDon('0900000013', now()->subDays(90)->toDateTimeString(), 500000);
+
+        $this->actingAs($this->admin)->post('/quan-ly/khach-hang/0900000013/danh-dau')->assertRedirect();
+        $this->actingAs($this->admin)
+            ->post('/quan-ly/khach-hang/0900000013/danh-dau', ['bo_danh_dau' => 1])
+            ->assertRedirect();
+
+        $this->assertSame(
+            'chua_xem_xet',
+            app(CustomerInsightService::class)->tatCaKhach(null)->firstWhere('phone', '0900000013')['review']
+        );
+    }
+
+    public function test_vai_chi_xem_khong_duoc_danh_dau(): void
+    {
+        $this->hoaDon('0900000014', now()->subDays(10)->toDateTimeString(), 500000);
+
+        $viewer = User::create([
+            'name' => 'Người xem', 'email' => 'xem@thegats.vn', 'password' => 'matkhau123',
+            'role' => Roles::VIEWER, 'brand_id' => $this->branch->brand_id, 'is_active' => true,
+        ]);
+
+        $this->actingAs($viewer)
+            ->post('/quan-ly/khach-hang/0900000014/danh-dau')
+            ->assertForbidden();
+    }
+
+    public function test_bo_loc_thu_hep_dung_nhom_khach(): void
+    {
+        // Khach ghe nhieu, chi nhieu.
+        foreach ([120, 110, 100, 90, 80] as $truoc) {
+            $this->hoaDon('0900000015', now()->subDays($truoc)->toDateTimeString(), 2000000);
+        }
+
+        // Khach ghe mot lan, chi it.
+        $this->hoaDon('0900000016', now()->subDays(5)->toDateTimeString(), 200000);
+
+        $s = app(CustomerInsightService::class);
+        $tatCa = $s->tatCaKhach(null);
+
+        $this->assertCount(2, $tatCa);
+
+        $nhieuLan = $s->locVaXep($tatCa, 'spend', ['visits_min' => 5]);
+        $this->assertCount(1, $nhieuLan);
+        $this->assertSame('0900000015', $nhieuLan->first()['phone']);
+
+        $chiNhieu = $s->locVaXep($tatCa, 'spend', ['spend_min' => 1000000]);
+        $this->assertSame('0900000015', $chiNhieu->first()['phone']);
+
+        $vangLau = $s->locVaXep($tatCa, 'spend', ['vang_min' => 30]);
+        $this->assertCount(1, $vangLau);
+        $this->assertSame('0900000015', $vangLau->first()['phone']);
+
+        $timTheoSo = $s->locVaXep($tatCa, 'spend', ['tim' => '0016']);
+        $this->assertCount(1, $timTheoSo);
+        $this->assertSame('0900000016', $timTheoSo->first()['phone']);
+
+        $this->assertCount(0, $s->locVaXep($tatCa, 'spend', ['segment' => ['deu_dan'], 'visits_min' => 99]));
+    }
+
+    public function test_so_lieu_theo_thang_tach_khach_moi_va_khach_quay_lai(): void
+    {
+        $this->hoaDon('0900000017', now()->subMonths(2)->startOfMonth()->addDays(2)->toDateTimeString(), 500000);
+        $this->hoaDon('0900000017', now()->startOfMonth()->addDays(2)->toDateTimeString(), 600000);
+        $this->hoaDon('0900000018', now()->startOfMonth()->addDays(3)->toDateTimeString(), 400000);
+
+        $thang = collect(app(CustomerInsightService::class)->theoThang(null, 6))->keyBy('month');
+
+        $nay = $thang[now()->format('Y-m')];
+
+        $this->assertSame(1, $nay['new_customers']);   // 0900000018
+        $this->assertSame(1, $nay['returning']);       // 0900000017
     }
 
     public function test_quan_ly_chi_thay_hoa_don_cua_quan_minh(): void

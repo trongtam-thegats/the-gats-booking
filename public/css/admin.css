@@ -590,3 +590,12 @@ rect:focus-visible, g:focus-visible { outline: 2px solid var(--gold); outline-of
     .range-presets { width: 100%; }
     .range-presets a { flex: 1; text-align: center; }
 }
+
+/* Hang cac o tich cua bo loc, tu xuong dong khi het cho. */
+.chip-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 18px;
+}
+
+.chip-row .check { font-size: 13.5px; }
