@@ -35,6 +35,28 @@ class CustomerInsightService
     ];
 
     /**
+     * Ket qua xem xet duoc coi la mot tinh trang da xac nhan, de len tinh trang
+     * may tu suy ra.
+     *
+     * Nguoi da goi va biet chac thi lu du lieu doan gi cung khong bang. Rieng
+     * "da lien he" khong nam day: no chi ghi nhan da goi, chua noi len dieu gi
+     * ve quan he cua khach voi quan.
+     *
+     * @var array<string, string>
+     */
+    public const XAC_NHAN = [
+        'se_quay_lai' => 'Hẹn sẽ quay lại',
+        'khong_quan_tam' => 'Không quan tâm',
+        'da_chuyen_di' => 'Đã chuyển đi xa',
+        'so_sai' => 'Số sai, không liên lạc được',
+        'da_roi_bo' => 'Đã rời bỏ',
+        'khong_can' => 'Không cần chăm sóc',
+    ];
+
+    /** Tien to cua khoa tinh trang da xac nhan, de khong dung khoa voi TINH_TRANG. */
+    public const TIEN_TO_XAC_NHAN = 'xn_';
+
+    /**
      * Trang thai xem xet cua mot khach.
      *
      * "Da ghe lai" khong ai bam tay ca - he thong so lan ghe gan nhat voi thoi
@@ -50,21 +72,48 @@ class CustomerInsightService
     ];
 
     /**
+     * Moi tinh trang co the hien ra, ca may suy ra lan nguoi xac nhan.
+     *
+     * @return array<string, string>
+     */
+    public static function moiTinhTrang(): array
+    {
+        $ket = self::TINH_TRANG;
+
+        foreach (self::XAC_NHAN as $ma => $nhan) {
+            $ket[self::TIEN_TO_XAC_NHAN.$ma] = $nhan;
+        }
+
+        return $ket;
+    }
+
+    public static function nhanTinhTrang(string $ma): string
+    {
+        return self::moiTinhTrang()[$ma] ?? $ma;
+    }
+
+    public static function laXacNhan(string $ma): bool
+    {
+        return str_starts_with($ma, self::TIEN_TO_XAC_NHAN);
+    }
+
+    /**
      * Tong quan do phu du lieu va quy mo.
      *
      * @param  array<int>|null  $branchIds
      * @return array<string, mixed>
      */
-    public function overview(?array $branchIds): array
+    public function overview(?array $branchIds, ?Carbon $tuNgay = null): array
     {
-        $hoaDon = Invoice::query()->choDiaDiem($branchIds)->thanhCong();
+        $hoaDon = Invoice::query()->choDiaDiem($branchIds)->thanhCong()
+            ->when($tuNgay, fn ($q) => $q->where('paid_at', '>=', $tuNgay));
 
         $tong = (clone $hoaDon)->count();
         $coSdt = (clone $hoaDon)->coKhach()->count();
         $doanhThu = (float) (clone $hoaDon)->sum('total');
         $doanhThuNhanDien = (float) (clone $hoaDon)->coKhach()->sum('total');
 
-        $khach = $this->tongHopHoaDon($branchIds);
+        $khach = $this->tongHopHoaDon($branchIds, $tuNgay);
         $quayLai = $khach->filter(fn ($k) => $k['visits'] >= 2);
 
         return [
@@ -93,8 +142,9 @@ class CustomerInsightService
         string $sapXep = 'spend',
         int $gioiHan = 100,
         array $loc = [],
+        ?Carbon $tuNgay = null,
     ): Collection {
-        return $this->locVaXep($this->tatCaKhach($branchIds), $sapXep, $loc)->take($gioiHan);
+        return $this->locVaXep($this->tatCaKhach($branchIds, $tuNgay), $sapXep, $loc)->take($gioiHan);
     }
 
     /**
@@ -106,9 +156,9 @@ class CustomerInsightService
      * @param  array<int>|null  $branchIds
      * @return Collection<int, array<string, mixed>>
      */
-    public function tatCaKhach(?array $branchIds): Collection
+    public function tatCaKhach(?array $branchIds, ?Carbon $tuNgay = null): Collection
     {
-        $khach = $this->tongHopHoaDon($branchIds);
+        $khach = $this->tongHopHoaDon($branchIds, $tuNgay);
 
         if ($khach->isEmpty()) {
             return collect();
@@ -126,6 +176,7 @@ class CustomerInsightService
                 $k['card'] = $the[$k['phone']] ?? null;
                 $k['note'] = $ghiChu[$k['phone']] ?? null;
                 $k['review'] = $this->trangThaiXemXet($k['note'], $k['last_at'], $k['booking']);
+                $k['trang_thai'] = $this->tinhTrangHienThi($k['segment'], $k['note'], $k['review']);
 
                 return $k;
             })
@@ -144,7 +195,9 @@ class CustomerInsightService
             ->sortByDesc(fn (array $k) => match ($sapXep) {
                 'visits' => [$k['visits'], $k['spend']],
                 'recent' => [$k['last_at']?->getTimestamp() ?? 0, $k['spend']],
-                'risk' => [$k['visits'] >= 2 && $k['segment'] === 'nguy_co' ? 1 : 0, $k['spend']],
+                // Da xac nhan xong thi khong con "gap" nua - do chinh la muc dich
+                // cua viec danh dau: khoi goi lai nguoi vua goi.
+                'risk' => [$k['visits'] >= 2 && $k['trang_thai'] === 'nguy_co' ? 1 : 0, $k['spend']],
                 'avg' => [$k['avg'], $k['visits']],
                 'vang' => [$k['days_since'] ?? -1, $k['spend']],
                 default => [$k['spend'], $k['visits']],
@@ -158,7 +211,7 @@ class CustomerInsightService
      */
     protected function hopLoc(array $k, array $loc): bool
     {
-        if (! empty($loc['segment']) && ! in_array($k['segment'], (array) $loc['segment'], true)) {
+        if (! empty($loc['segment']) && ! in_array($k['trang_thai'], (array) $loc['segment'], true)) {
             return false;
         }
 
@@ -298,9 +351,10 @@ class CustomerInsightService
             'name' => $co['name'],
             'card' => PosCustomer::where('phone', $phone)->first(),
             'note' => $ghiChu,
-            'review' => $this->trangThaiXemXet($ghiChu, $co['last_at'], [
+            'review' => $xemXet = $this->trangThaiXemXet($ghiChu, $co['last_at'], [
                 'last_date' => $don->max('booking_date'),
             ]),
+            'trang_thai' => $this->tinhTrangHienThi($co['segment'], $ghiChu, $xemXet),
             'stats' => $co,
             'habits' => $this->thoiQuen($dung),
             'invoices' => $hoaDon,
@@ -419,12 +473,18 @@ class CustomerInsightService
      * @param  array<int>|null  $branchIds
      * @return Collection<string, array<string, mixed>>
      */
-    protected function tongHopHoaDon(?array $branchIds): Collection
+    protected function tongHopHoaDon(?array $branchIds, ?Carbon $tuNgay = null): Collection
     {
+        // Lan ghe dau tien tinh tren TOAN BO lich su, khong theo khoang dang xem.
+        // Neu khong thi xem "1 thang gan nhat" se thay ai cung la khach moi,
+        // ke ca nguoi da gan bo voi quan tu hai nam truoc.
+        $lanDauThat = $tuNgay ? $this->lanGheDauTien($branchIds) : collect();
+
         return Invoice::query()
             ->choDiaDiem($branchIds)
             ->thanhCong()
             ->coKhach()
+            ->when($tuNgay, fn ($q) => $q->where('paid_at', '>=', $tuNgay))
             ->selectRaw('customer_phone, MAX(customer_name) as ten, COUNT(*) as so_lan, '
                 .'SUM(total) as tong_chi, SUM(tip) as tong_tip, '
                 .'MIN(paid_at) as lan_dau, MAX(paid_at) as lan_cuoi, '
@@ -442,7 +502,27 @@ class CustomerInsightService
                 'guests' => (int) $r->tong_khach,
                 'first_at' => $r->lan_dau ? Carbon::parse($r->lan_dau) : null,
                 'last_at' => $r->lan_cuoi ? Carbon::parse($r->lan_cuoi) : null,
+                'first_ever' => ($lanDauThat[$r->customer_phone] ?? null)
+                    ? Carbon::parse($lanDauThat[$r->customer_phone])
+                    : ($r->lan_dau ? Carbon::parse($r->lan_dau) : null),
             ]]);
+    }
+
+    /**
+     * Lan ghe dau tien cua tung khach tren toan bo lich su.
+     *
+     * @param  array<int>|null  $branchIds
+     * @return Collection<string, string>
+     */
+    protected function lanGheDauTien(?array $branchIds): Collection
+    {
+        return Invoice::query()
+            ->choDiaDiem($branchIds)
+            ->thanhCong()
+            ->coKhach()
+            ->selectRaw('customer_phone, MIN(paid_at) as lan_dau')
+            ->groupBy('customer_phone')
+            ->pluck('lan_dau', 'customer_phone');
     }
 
     /**
@@ -491,7 +571,28 @@ class CustomerInsightService
             'guests' => (int) $hoaDon->sum('party_size'),
             'first_at' => $hoaDon->min('paid_at') ? Carbon::parse($hoaDon->min('paid_at')) : null,
             'last_at' => $hoaDon->max('paid_at') ? Carbon::parse($hoaDon->max('paid_at')) : null,
+            'first_ever' => $hoaDon->min('paid_at') ? Carbon::parse($hoaDon->min('paid_at')) : null,
         ];
+    }
+
+    /**
+     * Tinh trang hien ra cho nguoi dung.
+     *
+     * Nguoi xac nhan de len may suy ra: da goi va biet chac khach chuyen di xa
+     * thi khong con ly do gi hien "nguy co roi bo" nua.
+     *
+     * Nhung khach quay lai roi thi xac nhan cu het hieu luc - luc do lai lay
+     * theo du lieu, vi du lieu moi hon loi xac nhan.
+     */
+    protected function tinhTrangHienThi(string $segment, ?GuestNote $ghiChu, string $xemXet): string
+    {
+        $ketQua = $ghiChu?->review_outcome;
+
+        if ($xemXet === 'da_ghe_lai' || ! $ketQua || ! isset(self::XAC_NHAN[$ketQua])) {
+            return $segment;
+        }
+
+        return self::TIEN_TO_XAC_NHAN.$ketQua;
     }
 
     /**
@@ -522,7 +623,7 @@ class CustomerInsightService
         return [
             'days_since' => $vang,
             'cadence' => $nhip,
-            'segment' => $this->tinhTrang($soLan, $vang, $nhip, $lanDau),
+            'segment' => $this->tinhTrang($soLan, $vang, $nhip, $k['first_ever'] ?? $lanDau),
         ];
     }
 

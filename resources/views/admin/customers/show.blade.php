@@ -17,6 +17,12 @@
         'thua_dan' => 'status-pending',
         'nguy_co' => 'status-cancelled',
         'mot_lan' => 'status-completed',
+        'xn_se_quay_lai' => 'status-confirmed',
+        'xn_khong_quan_tam' => 'status-cancelled',
+        'xn_da_chuyen_di' => 'status-completed',
+        'xn_so_sai' => 'status-completed',
+        'xn_da_roi_bo' => 'status-cancelled',
+        'xn_khong_can' => 'status-completed',
     ];
 
     $ghiChu = $ho['note'] ?? null;
@@ -34,7 +40,7 @@
             .$ghiChu->reviewed_at->format('d/m/Y').'. Không cần chăm sóc nữa.'];
     }
 
-    if ($co['segment'] === 'nguy_co' && $co['visits'] >= 2 && $ho['review'] !== 'da_ghe_lai') {
+    if ($ho['trang_thai'] === 'nguy_co' && $co['visits'] >= 2 && $ho['review'] !== 'da_ghe_lai') {
         $luuY[] = ['warn', 'Khách quen thường ghé mỗi '.$co['cadence'].' ngày nhưng đã '
             .$co['days_since'].' ngày không thấy. Đáng gọi hỏi thăm.'];
     }
@@ -108,10 +114,12 @@
         <div class="stat">
             <span>Tình trạng</span>
             <b style="font-size:19px">
-                <span class="pill {{ $mauTinhTrang[$co['segment']] ?? '' }}">{{ Insight::TINH_TRANG[$co['segment']] }}</span>
+                <span class="pill {{ $mauTinhTrang[$ho['trang_thai']] ?? '' }}">{{ Insight::nhanTinhTrang($ho['trang_thai']) }}</span>
             </b>
             <small class="muted">
-                @if ($co['first_at'])
+                @if (Insight::laXacNhan($ho['trang_thai']))
+                    đã gọi và xác nhận
+                @elseif ($co['first_at'])
                     lần đầu {{ $co['first_at']->format('d/m/Y') }}
                 @endif
             </small>

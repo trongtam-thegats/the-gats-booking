@@ -39,14 +39,20 @@ class CustomerInsightController extends AdminController
         $soLuong = max(10, min(500, (int) $request->query('so-luong', 100)));
         $loc = $this->boLoc($request);
 
+        $khoang = (int) $request->query('khoang', 0);
+        $khoang = isset(self::KHOANG[$khoang]) ? $khoang : 0;
+        $tuNgay = $khoang ? now()->subMonths($khoang)->startOfDay() : null;
+
         // Tinh mot lan roi vua dem tong theo nhom, vua loc ra phan hien thi.
-        $tatCa = $this->insight->tatCaKhach($branchIds);
+        $tatCa = $this->insight->tatCaKhach($branchIds, $tuNgay);
         $daLoc = $this->insight->locVaXep($tatCa, $sapXep, $loc);
 
         return view('admin.customers.index', [
             'branches' => $branches,
             'branch' => $branch,
-            'tongQuan' => $this->insight->overview($branchIds),
+            'tongQuan' => $this->insight->overview($branchIds, $tuNgay),
+            'khoang' => $khoang,
+            'tuNgay' => $tuNgay,
             'tatCa' => $tatCa,
             'khach' => $daLoc->take($soLuong),
             'soKhopLoc' => $daLoc->count(),
@@ -54,7 +60,7 @@ class CustomerInsightController extends AdminController
             'sapXep' => $sapXep,
             'soLuong' => $soLuong,
             'loc' => $loc,
-            'nhomTinhTrang' => $tatCa->groupBy('segment')->map->count(),
+            'nhomTinhTrang' => $tatCa->groupBy('trang_thai')->map->count(),
             'nhomXemXet' => $tatCa->groupBy('review')->map->count(),
             'hangThe' => $tatCa->map(fn ($k) => $k['card']?->tier ?: '(không hạng)')
                 ->countBy()->sortDesc(),
@@ -121,6 +127,20 @@ class CustomerInsightController extends AdminController
         );
     }
 
+    /**
+     * Khoang thoi gian de tinh lai moi chi so, tinh bang thang.
+     *
+     * Doi khoang la doi han goc nhin: mot thang cho biet thang vua roi ai quay
+     * lai va ai moi den; ba den sau thang la trung han; mot nam du de nhin ra
+     * ai that su gan bo.
+     */
+    public const KHOANG = [
+        1 => '1 tháng gần nhất',
+        3 => '3 tháng gần nhất',
+        6 => '6 tháng gần nhất',
+        12 => '12 tháng gần nhất',
+    ];
+
     /** Cac muc chon san cua o "ghe it nhat". */
     public const MOC_SO_LAN = [2 => 'Từ 2 lần', 5 => 'Từ 5 lần', 10 => 'Từ 10 lần', 20 => 'Từ 20 lần'];
 
@@ -157,7 +177,7 @@ class CustomerInsightController extends AdminController
         $loc = [];
 
         $chon = [
-            'segment' => ['tinh-trang', CustomerInsightService::TINH_TRANG],
+            'segment' => ['tinh-trang', CustomerInsightService::moiTinhTrang()],
             'review' => ['xem-xet', CustomerInsightService::XEM_XET],
         ];
 

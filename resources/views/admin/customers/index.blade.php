@@ -10,11 +10,19 @@
 
     /** Mau nhan, dung lai bang mau cua trang dat ban. */
     $mauTinhTrang = [
+        // May suy ra tu du lieu.
         'deu_dan' => 'status-confirmed',
         'khach_moi' => 'status-seated',
         'thua_dan' => 'status-pending',
         'nguy_co' => 'status-cancelled',
         'mot_lan' => 'status-completed',
+        // Nguoi da goi va xac nhan - de len tinh trang may doan.
+        'xn_se_quay_lai' => 'status-confirmed',
+        'xn_khong_quan_tam' => 'status-cancelled',
+        'xn_da_chuyen_di' => 'status-completed',
+        'xn_so_sai' => 'status-completed',
+        'xn_da_roi_bo' => 'status-cancelled',
+        'xn_khong_can' => 'status-completed',
     ];
 
     $mauXemXet = [
@@ -38,15 +46,21 @@
         'thua_dan' => '#c8a15a',
         'nguy_co' => '#e0685f',
         'mot_lan' => '#8a8a8a',
+        'xn_se_quay_lai' => '#8fd39a',
+        'xn_khong_quan_tam' => '#c2564f',
+        'xn_da_chuyen_di' => '#6f6a63',
+        'xn_so_sai' => '#6f6a63',
+        'xn_da_roi_bo' => '#a8443d',
+        'xn_khong_can' => '#6f6a63',
     ];
 
-    $dongNhom = collect(Insight::TINH_TRANG)
+    $dongNhom = collect(Insight::moiTinhTrang())
         ->map(fn ($nhan, $ma) => [
             'ma' => $ma,
             'label' => $nhan,
             'value' => (int) ($nhomTinhTrang[$ma] ?? 0),
             'display' => number_format((int) ($nhomTinhTrang[$ma] ?? 0)).' khách',
-            'spendText' => number_format($tatCa->where('segment', $ma)->sum('spend')).'đ',
+            'spendText' => number_format($tatCa->where('trang_thai', $ma)->sum('spend')).'đ',
         ])
         ->filter(fn ($r) => $r['value'] > 0)
         ->values();
@@ -138,6 +152,15 @@
         </div>
     @endif
 
+    @if ($khoang)
+        <p class="muted small" style="margin:-4px 0 14px">
+            Mọi con số bên dưới được <b>tính lại trong {{ mb_strtolower(Ctl::KHOANG[$khoang]) }}</b>
+            (từ {{ $tuNgay->format('d/m/Y') }}): số lần ghé, chi tiêu, nhịp ghé và tình trạng.
+            Riêng "khách mới" vẫn tính theo lần ghé đầu tiên trong toàn bộ lịch sử, nên khách gắn bó
+            lâu năm không bị gọi nhầm là mới.
+        </p>
+    @endif
+
     <div class="stats">
         <div class="stat">
             <span>Khách nhận diện được</span>
@@ -169,7 +192,7 @@
     {{-- Bieu do. Di chuot vao cot de xem so lieu; nut chuyen sang bang so. --}}
     <div class="card">
         <div class="page-head" style="margin-bottom:6px">
-            <h2 style="margin:0">Doanh thu theo tháng</h2>
+            <h2 style="margin:0">Doanh thu theo tháng <span class="muted" style="font-weight:400;font-size:13px">· toàn bộ kỳ dữ liệu</span></h2>
             <button class="btn btn-ghost btn-sm" type="button" data-viz-toggle aria-pressed="false">Xem bảng số</button>
         </div>
 
@@ -271,6 +294,17 @@
             @include('admin.partials.branch-filter')
 
             <div class="field">
+                <label for="khoang">Khoảng thời gian</label>
+                <select id="khoang" name="khoang" class="@if ($khoang) dang-loc @endif"
+                        onchange="this.form.submit()">
+                    <option value="">Toàn bộ dữ liệu</option>
+                    @foreach (Ctl::KHOANG as $thang => $nhan)
+                        <option value="{{ $thang }}" @selected($khoang === $thang)>{{ $nhan }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div class="field">
                 <label for="tim">Tìm khách</label>
                 <input type="search" id="tim" name="tim" class="@if (! empty($loc['tim'])) dang-loc @endif" value="{{ $loc['tim'] ?? '' }}"
                        placeholder="Tên hoặc số điện thoại">
@@ -280,11 +314,21 @@
                 <label for="tinh-trang">Tình trạng</label>
                 <select id="tinh-trang" name="tinh-trang" class="@if (! empty($loc['segment'])) dang-loc @endif" onchange="this.form.submit()">
                     <option value="">Tất cả tình trạng</option>
-                    @foreach (Insight::TINH_TRANG as $ma => $nhan)
-                        <option value="{{ $ma }}" @selected(in_array($ma, $loc['segment'] ?? [], true))>
-                            {{ $nhan }} ({{ number_format($nhomTinhTrang[$ma] ?? 0) }})
-                        </option>
-                    @endforeach
+                    <optgroup label="Hệ thống suy ra từ dữ liệu">
+                        @foreach (Insight::TINH_TRANG as $ma => $nhan)
+                            <option value="{{ $ma }}" @selected(in_array($ma, $loc['segment'] ?? [], true))>
+                                {{ $nhan }} ({{ number_format($nhomTinhTrang[$ma] ?? 0) }})
+                            </option>
+                        @endforeach
+                    </optgroup>
+                    <optgroup label="Đã gọi và xác nhận">
+                        @foreach (Insight::XAC_NHAN as $ma => $nhan)
+                            @php($khoa = Insight::TIEN_TO_XAC_NHAN.$ma)
+                            <option value="{{ $khoa }}" @selected(in_array($khoa, $loc['segment'] ?? [], true))>
+                                {{ $nhan }} ({{ number_format($nhomTinhTrang[$khoa] ?? 0) }})
+                            </option>
+                        @endforeach
+                    </optgroup>
                 </select>
             </div>
 
@@ -380,7 +424,7 @@
     <div class="card">
         <div class="page-head" style="margin-bottom:10px">
             <h2 style="margin:0">
-                {{ number_format($soKhopLoc) }} khách khớp bộ lọc
+                {{ number_format($soKhopLoc) }} khách khớp bộ lọc{{ $khoang ? ' trong '.mb_strtolower(Ctl::KHOANG[$khoang]) : '' }}
                 @if ($soKhopLoc > $khach->count())
                     <span class="muted" style="font-weight:400">— đang hiện {{ number_format($khach->count()) }}</span>
                 @endif
@@ -431,9 +475,12 @@
                             <td class="num small">{{ $k['cadence'] === null ? '—' : $k['cadence'].'d' }}</td>
                             <td class="num small">{{ $k['days_since'] === null ? '—' : $k['days_since'].'d' }}</td>
                             <td>
-                                <span class="pill {{ $mauTinhTrang[$k['segment']] ?? '' }}">
-                                    {{ Insight::TINH_TRANG[$k['segment']] }}
+                                <span class="pill {{ $mauTinhTrang[$k['trang_thai']] ?? '' }}">
+                                    {{ Insight::nhanTinhTrang($k['trang_thai']) }}
                                 </span>
+                                @if (Insight::laXacNhan($k['trang_thai']))
+                                    <br><span class="muted" style="font-size:11px">đã xác nhận</span>
+                                @endif
                             </td>
                             <td class="small">
                                 @if ($k['review'] === 'chua_xem_xet')

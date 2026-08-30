@@ -324,6 +324,106 @@ class PhanTichKhachHangTest extends TestCase
         $this->assertSame(1, $nay['returning']);       // 0900000017
     }
 
+    public function test_ket_qua_xac_nhan_de_len_tinh_trang_may_suy_ra(): void
+    {
+        // Ghe deu moi 10 ngay roi bien mat 90 ngay -> may doan "nguy co roi bo".
+        foreach ([130, 120, 110, 100, 90] as $truoc) {
+            $this->hoaDon('0900000020', now()->subDays($truoc)->toDateTimeString(), 400000);
+        }
+
+        $s = app(CustomerInsightService::class);
+        $this->assertSame('nguy_co', $s->tatCaKhach(null)->firstWhere('phone', '0900000020')['trang_thai']);
+
+        // Nhan vien goi va biet chac khach da chuyen di xa.
+        $this->actingAs($this->admin)
+            ->post('/quan-ly/khach-hang/0900000020/danh-dau', ['review_outcome' => 'da_chuyen_di'])
+            ->assertRedirect();
+
+        $k = $s->tatCaKhach(null)->firstWhere('phone', '0900000020');
+
+        $this->assertSame('xn_da_chuyen_di', $k['trang_thai']);
+        $this->assertSame('Đã chuyển đi xa', CustomerInsightService::nhanTinhTrang($k['trang_thai']));
+        $this->assertTrue(CustomerInsightService::laXacNhan($k['trang_thai']));
+
+        // Va roi khoi danh sach can cham soc gap - do la muc dich cua viec danh dau.
+        $canGoi = $s->locVaXep($s->tatCaKhach(null), 'spend', ['segment' => ['nguy_co']]);
+        $this->assertFalse($canGoi->contains('phone', '0900000020'));
+    }
+
+    public function test_ket_qua_da_lien_he_khong_de_len_tinh_trang(): void
+    {
+        foreach ([130, 120, 110, 100, 90] as $truoc) {
+            $this->hoaDon('0900000021', now()->subDays($truoc)->toDateTimeString(), 400000);
+        }
+
+        // "Da lien he" chi ghi nhan da goi, chua noi gi ve quan he cua khach.
+        $this->actingAs($this->admin)
+            ->post('/quan-ly/khach-hang/0900000021/danh-dau', ['review_outcome' => 'da_lien_he'])
+            ->assertRedirect();
+
+        $k = app(CustomerInsightService::class)->tatCaKhach(null)->firstWhere('phone', '0900000021');
+
+        $this->assertSame('nguy_co', $k['trang_thai']);
+        $this->assertSame('da_xem_xet', $k['review']);
+    }
+
+    public function test_khach_quay_lai_thi_xac_nhan_cu_het_hieu_luc(): void
+    {
+        $this->hoaDon('0900000022', now()->subDays(90)->toDateTimeString(), 400000);
+
+        $this->actingAs($this->admin)
+            ->post('/quan-ly/khach-hang/0900000022/danh-dau', ['review_outcome' => 'da_roi_bo'])
+            ->assertRedirect();
+
+        $s = app(CustomerInsightService::class);
+        $this->assertSame('xn_da_roi_bo', $s->tatCaKhach(null)->firstWhere('phone', '0900000022')['trang_thai']);
+
+        // Khach quay lai that -> loi xac nhan "da roi bo" khong con dung nua.
+        $this->travel(3)->days();
+        $this->hoaDon('0900000022', now()->toDateTimeString(), 500000);
+
+        $k = $s->tatCaKhach(null)->firstWhere('phone', '0900000022');
+
+        $this->assertSame('da_ghe_lai', $k['review']);
+        $this->assertFalse(CustomerInsightService::laXacNhan($k['trang_thai']));
+    }
+
+    public function test_khoang_thoi_gian_tinh_lai_moi_chi_so(): void
+    {
+        // Khach ghe day dac tu lau, gan day chi ghe mot lan.
+        foreach ([300, 290, 280, 270] as $truoc) {
+            $this->hoaDon('0900000023', now()->subDays($truoc)->toDateTimeString(), 1000000);
+        }
+        $this->hoaDon('0900000023', now()->subDays(10)->toDateTimeString(), 500000);
+
+        $s = app(CustomerInsightService::class);
+
+        $toanBo = $s->tatCaKhach(null)->firstWhere('phone', '0900000023');
+        $this->assertSame(5, $toanBo['visits']);
+        $this->assertSame(4500000.0, $toanBo['spend']);
+
+        // Nhin trong 1 thang thi chi con dung mot lan ghe.
+        $motThang = $s->tatCaKhach(null, now()->subMonth())->firstWhere('phone', '0900000023');
+        $this->assertSame(1, $motThang['visits']);
+        $this->assertSame(500000.0, $motThang['spend']);
+    }
+
+    public function test_khach_lau_nam_khong_bi_goi_nham_la_khach_moi_khi_xem_khoang_ngan(): void
+    {
+        // Ghe lan dau tu rat lau roi, va van con ghe gan day.
+        $this->hoaDon('0900000024', now()->subDays(400)->toDateTimeString(), 800000);
+        $this->hoaDon('0900000024', now()->subDays(5)->toDateTimeString(), 900000);
+
+        $motThang = app(CustomerInsightService::class)
+            ->tatCaKhach(null, now()->subMonth())
+            ->firstWhere('phone', '0900000024');
+
+        // Trong khoang 1 thang khach nay chi co dung mot hoa don, nhung lan ghe
+        // dau tien that su la 400 ngay truoc nen khong phai khach moi.
+        $this->assertSame(1, $motThang['visits']);
+        $this->assertNotSame('khach_moi', $motThang['segment']);
+    }
+
     public function test_quan_ly_chi_thay_hoa_don_cua_quan_minh(): void
     {
         $brandB = Brand::create([
