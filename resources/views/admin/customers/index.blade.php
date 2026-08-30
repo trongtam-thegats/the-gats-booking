@@ -31,11 +31,19 @@
         'da_ghe_lai' => 'status-confirmed',
     ];
 
-    $tienGon = fn ($so) => $so >= 1000000000
-        ? rtrim(rtrim(number_format($so / 1000000000, 2), '0'), ',.').' tỉ'
-        : ($so >= 1000000
-            ? rtrim(rtrim(number_format($so / 1000000, 1), '0'), ',.').' tr'
-            : number_format(round($so / 1000)).'k');
+    // Rut gon so tien cho o thong ke: "5,5 tỉ" chu khong phai "5,496,905,959".
+    // Dau phay la dau thap phan, dung loi Viet Nam.
+    $tienGon = function ($so) {
+        [$chia, $donVi] = match (true) {
+            $so >= 1000000000 => [1000000000, 'tỉ'],
+            $so >= 1000000 => [1000000, 'triệu'],
+            default => [1000, 'nghìn'],
+        };
+
+        $gt = rtrim(rtrim(number_format($so / $chia, 1, ',', '.'), '0'), ',');
+
+        return $gt.' '.$donVi;
+    };
 
     $dangLoc = ! empty($loc);
 
@@ -151,142 +159,6 @@
             Phần còn lại không truy được khách là ai, nên mọi con số dưới đây chỉ nói về nhóm khách đã ghi nhận được.
         </div>
     @endif
-
-    @if ($khoang)
-        <p class="muted small" style="margin:-4px 0 14px">
-            Mọi con số bên dưới được <b>tính lại trong {{ mb_strtolower(Ctl::KHOANG[$khoang]) }}</b>
-            (từ {{ $tuNgay->format('d/m/Y') }}): số lần ghé, chi tiêu, nhịp ghé và tình trạng.
-            Riêng "khách mới" vẫn tính theo lần ghé đầu tiên trong toàn bộ lịch sử, nên khách gắn bó
-            lâu năm không bị gọi nhầm là mới.
-        </p>
-    @endif
-
-    <div class="stats">
-        <div class="stat">
-            <span>Khách nhận diện được</span>
-            <b>{{ number_format($tongQuan['customers']) }}</b>
-            <small class="muted">trong {{ number_format($tongQuan['invoices']) }} hóa đơn</small>
-        </div>
-        <div class="stat accent">
-            <span>Khách quay lại</span>
-            <b>{{ number_format($tongQuan['returning']) }}</b>
-            <small class="muted">
-                {{ $tongQuan['customers'] ? round($tongQuan['returning'] / $tongQuan['customers'] * 100) : 0 }}%
-                — từ 2 hóa đơn trở lên
-            </small>
-        </div>
-        <div class="stat">
-            <span>Chi tiêu của khách quay lại</span>
-            <b>{{ $tienGon($tongQuan['returning_revenue']) }}<small>đ</small></b>
-        </div>
-        <div class="stat">
-            <span>Chưa xem xét</span>
-            <b>{{ number_format($nhomXemXet['chua_xem_xet'] ?? 0) }}</b>
-            <small class="muted">
-                đã xem xét {{ number_format($nhomXemXet['da_xem_xet'] ?? 0) }} ·
-                đã ghé lại {{ number_format($nhomXemXet['da_ghe_lai'] ?? 0) }}
-            </small>
-        </div>
-    </div>
-
-    {{-- Bieu do. Di chuot vao cot de xem so lieu; nut chuyen sang bang so. --}}
-    <div class="card">
-        <div class="page-head" style="margin-bottom:6px">
-            <h2 style="margin:0">Doanh thu theo tháng <span class="muted" style="font-weight:400;font-size:13px">· toàn bộ kỳ dữ liệu</span></h2>
-            <button class="btn btn-ghost btn-sm" type="button" data-viz-toggle aria-pressed="false">Xem bảng số</button>
-        </div>
-
-        <figure class="viz-figure">
-            <div class="viz-plot"></div>
-            <script type="application/json">@json($vizThang)</script>
-            <div class="viz-table table-wrap">
-                <table>
-                    <thead><tr><th>Tháng</th><th class="num">Hóa đơn</th><th class="num">Có khách</th><th class="num">Doanh thu</th></tr></thead>
-                    <tbody>
-                    @foreach ($theoThang as $m)
-                        <tr>
-                            <td>{{ $m['label'] }}</td>
-                            <td class="num">{{ number_format($m['invoices']) }}</td>
-                            <td class="num">{{ number_format($m['identified']) }}</td>
-                            <td class="num">{{ number_format($m['revenue']) }}đ</td>
-                        </tr>
-                    @endforeach
-                    </tbody>
-                </table>
-            </div>
-        </figure>
-    </div>
-
-    <div class="card">
-        <div class="page-head" style="margin-bottom:6px">
-            <h2 style="margin:0">Khách mới và khách quay lại</h2>
-            <button class="btn btn-ghost btn-sm" type="button" data-viz-toggle aria-pressed="false">Xem bảng số</button>
-        </div>
-        <p class="muted small">
-            "Khách mới" là tháng đầu tiên hệ thống ghi nhận được số điện thoại của người đó.
-            Cột quay lại càng dày thì việc giữ khách càng tốt.
-        </p>
-
-        <figure class="viz-figure">
-            <div class="viz-plot"></div>
-            <script type="application/json">@json($vizKhachThang)</script>
-            <div class="viz-table table-wrap">
-                <table>
-                    <thead><tr><th>Tháng</th><th class="num">Khách mới</th><th class="num">Quay lại</th></tr></thead>
-                    <tbody>
-                    @foreach ($theoThang as $m)
-                        <tr><td>{{ $m['label'] }}</td><td class="num">{{ $m['new_customers'] }}</td><td class="num">{{ $m['returning'] }}</td></tr>
-                    @endforeach
-                    </tbody>
-                </table>
-            </div>
-        </figure>
-    </div>
-
-    <div class="grid-2">
-        @if ($vizNhom['rows'])
-            <div class="card">
-                <h2>Cơ cấu {{ number_format($tatCa->count()) }} khách</h2>
-                <p class="muted small">
-                    Tình trạng tính theo <b>nhịp ghé của chính khách đó</b>: vắng quá ba lần nhịp quen thuộc
-                    thì coi là có nguy cơ rời bỏ.
-                </p>
-                <figure class="viz-figure">
-                    <div class="viz-plot"></div>
-                    <script type="application/json">@json($vizNhom)</script>
-                    <div class="viz-table table-wrap">
-                        <table>
-                            <thead><tr><th>Tình trạng</th><th class="num">Khách</th><th class="num">Chi tiêu</th></tr></thead>
-                            <tbody>
-                            @foreach ($vizNhom['rows'] as $r)
-                                <tr><td>{{ $r['label'] }}</td><td class="num">{{ $r['value'] }}</td><td class="num">{{ $r['spendText'] }}</td></tr>
-                            @endforeach
-                            </tbody>
-                        </table>
-                    </div>
-                </figure>
-            </div>
-        @endif
-
-        <div class="card">
-            <h2>Khách theo số lần ghé</h2>
-            <p class="muted small">Cột bên phải càng nặng tiền thì quán càng sống bằng khách quen.</p>
-            <figure class="viz-figure">
-                <div class="viz-plot"></div>
-                <script type="application/json">@json($vizSoLan)</script>
-                <div class="viz-table table-wrap">
-                    <table>
-                        <thead><tr><th>Số lần ghé</th><th class="num">Khách</th><th class="num">Chi tiêu</th></tr></thead>
-                        <tbody>
-                        @foreach ($theoSoLan as $b)
-                            <tr><td>{{ $b['label'] }}</td><td class="num">{{ number_format($b['value']) }}</td><td class="num">{{ number_format($b['spend']) }}đ</td></tr>
-                        @endforeach
-                        </tbody>
-                    </table>
-                </div>
-            </figure>
-        </div>
-    </div>
 
     {{-- Bo loc: mot hang cac o tha xuong, chon la chay luon. --}}
     <div class="card">
@@ -419,6 +291,142 @@
                 </select>
             </div>
         </form>
+    </div>
+
+    @if ($khoang)
+        <p class="muted small" style="margin:-4px 0 14px">
+            Mọi con số bên dưới được <b>tính lại trong {{ mb_strtolower(Ctl::KHOANG[$khoang]) }}</b>
+            (từ {{ $tuNgay->format('d/m/Y') }}): số lần ghé, chi tiêu, nhịp ghé và tình trạng.
+            Riêng "khách mới" vẫn tính theo lần ghé đầu tiên trong toàn bộ lịch sử, nên khách gắn bó
+            lâu năm không bị gọi nhầm là mới.
+        </p>
+    @endif
+
+    <div class="stats">
+        <div class="stat">
+            <span>Khách nhận diện được</span>
+            <b>{{ number_format($tongQuan['customers']) }}</b>
+            <small class="muted">trong {{ number_format($tongQuan['invoices']) }} hóa đơn</small>
+        </div>
+        <div class="stat accent">
+            <span>Khách quay lại</span>
+            <b>{{ number_format($tongQuan['returning']) }}</b>
+            <small class="muted">
+                {{ $tongQuan['customers'] ? round($tongQuan['returning'] / $tongQuan['customers'] * 100) : 0 }}%
+                — từ 2 hóa đơn trở lên
+            </small>
+        </div>
+        <div class="stat">
+            <span>Chi tiêu của khách quay lại</span>
+            <b style="font-size:22px">{{ $tienGon($tongQuan['returning_revenue']) }}</b>
+        </div>
+        <div class="stat">
+            <span>Chưa xem xét</span>
+            <b>{{ number_format($nhomXemXet['chua_xem_xet'] ?? 0) }}</b>
+            <small class="muted">
+                đã xem xét {{ number_format($nhomXemXet['da_xem_xet'] ?? 0) }} ·
+                đã ghé lại {{ number_format($nhomXemXet['da_ghe_lai'] ?? 0) }}
+            </small>
+        </div>
+    </div>
+
+    {{-- Bieu do. Di chuot vao cot de xem so lieu; nut chuyen sang bang so. --}}
+    <div class="card">
+        <div class="page-head" style="margin-bottom:6px">
+            <h2 style="margin:0">Doanh thu theo tháng <span class="muted" style="font-weight:400;font-size:13px">· toàn bộ kỳ dữ liệu</span></h2>
+            <button class="btn btn-ghost btn-sm" type="button" data-viz-toggle aria-pressed="false">Xem bảng số</button>
+        </div>
+
+        <figure class="viz-figure">
+            <div class="viz-plot"></div>
+            <script type="application/json">@json($vizThang)</script>
+            <div class="viz-table table-wrap">
+                <table>
+                    <thead><tr><th>Tháng</th><th class="num">Hóa đơn</th><th class="num">Có khách</th><th class="num">Doanh thu</th></tr></thead>
+                    <tbody>
+                    @foreach ($theoThang as $m)
+                        <tr>
+                            <td>{{ $m['label'] }}</td>
+                            <td class="num">{{ number_format($m['invoices']) }}</td>
+                            <td class="num">{{ number_format($m['identified']) }}</td>
+                            <td class="num">{{ number_format($m['revenue']) }}đ</td>
+                        </tr>
+                    @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </figure>
+    </div>
+
+    <div class="card">
+        <div class="page-head" style="margin-bottom:6px">
+            <h2 style="margin:0">Khách mới và khách quay lại</h2>
+            <button class="btn btn-ghost btn-sm" type="button" data-viz-toggle aria-pressed="false">Xem bảng số</button>
+        </div>
+        <p class="muted small">
+            "Khách mới" là tháng đầu tiên hệ thống ghi nhận được số điện thoại của người đó.
+            Cột quay lại càng dày thì việc giữ khách càng tốt.
+        </p>
+
+        <figure class="viz-figure">
+            <div class="viz-plot"></div>
+            <script type="application/json">@json($vizKhachThang)</script>
+            <div class="viz-table table-wrap">
+                <table>
+                    <thead><tr><th>Tháng</th><th class="num">Khách mới</th><th class="num">Quay lại</th></tr></thead>
+                    <tbody>
+                    @foreach ($theoThang as $m)
+                        <tr><td>{{ $m['label'] }}</td><td class="num">{{ $m['new_customers'] }}</td><td class="num">{{ $m['returning'] }}</td></tr>
+                    @endforeach
+                    </tbody>
+                </table>
+            </div>
+        </figure>
+    </div>
+
+    <div class="grid-2">
+        @if ($vizNhom['rows'])
+            <div class="card">
+                <h2>Cơ cấu {{ number_format($tatCa->count()) }} khách</h2>
+                <p class="muted small">
+                    Tình trạng tính theo <b>nhịp ghé của chính khách đó</b>: vắng quá ba lần nhịp quen thuộc
+                    thì coi là có nguy cơ rời bỏ.
+                </p>
+                <figure class="viz-figure">
+                    <div class="viz-plot"></div>
+                    <script type="application/json">@json($vizNhom)</script>
+                    <div class="viz-table table-wrap">
+                        <table>
+                            <thead><tr><th>Tình trạng</th><th class="num">Khách</th><th class="num">Chi tiêu</th></tr></thead>
+                            <tbody>
+                            @foreach ($vizNhom['rows'] as $r)
+                                <tr><td>{{ $r['label'] }}</td><td class="num">{{ $r['value'] }}</td><td class="num">{{ $r['spendText'] }}</td></tr>
+                            @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                </figure>
+            </div>
+        @endif
+
+        <div class="card">
+            <h2>Khách theo số lần ghé</h2>
+            <p class="muted small">Cột bên phải càng nặng tiền thì quán càng sống bằng khách quen.</p>
+            <figure class="viz-figure">
+                <div class="viz-plot"></div>
+                <script type="application/json">@json($vizSoLan)</script>
+                <div class="viz-table table-wrap">
+                    <table>
+                        <thead><tr><th>Số lần ghé</th><th class="num">Khách</th><th class="num">Chi tiêu</th></tr></thead>
+                        <tbody>
+                        @foreach ($theoSoLan as $b)
+                            <tr><td>{{ $b['label'] }}</td><td class="num">{{ number_format($b['value']) }}</td><td class="num">{{ number_format($b['spend']) }}đ</td></tr>
+                        @endforeach
+                        </tbody>
+                    </table>
+                </div>
+            </figure>
+        </div>
     </div>
 
     <div class="card">
