@@ -129,7 +129,11 @@ class PosImportService
         }
 
         $ketQua = ['moi' => 0, 'capNhat' => 0, 'boQua' => 0, 'coSdt' => 0, 'tong' => count($dong)];
-        $daCo = Invoice::pluck('id', 'code');
+
+        // Chi so hoa don cua rieng dia diem nay. POS danh so rieng cho tung
+        // quan nen hai quan de trung ma; doi chieu toan he thong se ghi de
+        // nham len hoa don cua quan khac.
+        $daCo = Invoice::where('branch_id', $branch->id)->pluck('id', 'code');
 
         $viec = function () use ($dong, $anhXa, $branch, $daCo, $doc, &$ketQua, $ghi) {
             foreach ($dong as $r) {
@@ -148,7 +152,10 @@ class PosImportService
                 isset($daCo[$ban['code']]) ? $ketQua['capNhat']++ : $ketQua['moi']++;
 
                 if ($ghi) {
-                    Invoice::updateOrCreate(['code' => $ban['code']], $ban + ['branch_id' => $branch->id]);
+                    Invoice::updateOrCreate(
+                        ['branch_id' => $branch->id, 'code' => $ban['code']],
+                        $ban
+                    );
                 }
             }
         };

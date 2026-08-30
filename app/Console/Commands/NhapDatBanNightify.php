@@ -85,17 +85,36 @@ class NhapDatBanNightify extends Command
         $bang = $this->chiMucBan($branch);
 
         $nguoiDung = User::pluck('id', 'email');
-        $daCo = Booking::whereIn('code', array_column($dong, 'RESERVATION_CODE'))->pluck('code')->all();
 
-        $ketQua = ['moi' => 0, 'bo_qua' => 0, 'thieu_ban' => 0, 'loi' => 0];
+        // Ma dat ban duy nhat tren toan he thong vi khach tra cuu don bang ma
+        // o trang /ma/{code}. Nen phai biet ma da co thuoc ve dia diem nao:
+        // trung ma trong cung quan la nhap lai, trung ma khac quan la dung do.
+        $daCo = Booking::whereIn('code', array_column($dong, 'RESERVATION_CODE'))
+            ->pluck('branch_id', 'code');
+
+        $ketQua = ['moi' => 0, 'bo_qua' => 0, 'thieu_ban' => 0, 'loi' => 0, 'dung_do' => 0];
         $banThieu = [];
+        $dungDo = [];
 
-        $viec = function () use ($dong, $branch, $bang, $nguoiDung, $daCo, $availability, &$ketQua, &$banThieu, $ghi) {
+        $viec = function () use ($dong, $branch, $bang, $nguoiDung, $daCo, $availability, &$ketQua, &$banThieu, &$dungDo, $ghi) {
             foreach ($dong as $r) {
                 $ma = trim((string) ($r['RESERVATION_CODE'] ?? ''));
 
-                if ($ma === '' || in_array($ma, $daCo, true)) {
+                if ($ma === '') {
                     $ketQua['bo_qua']++;
+
+                    continue;
+                }
+
+                if (isset($daCo[$ma])) {
+                    if ((int) $daCo[$ma] === (int) $branch->id) {
+                        $ketQua['bo_qua']++;
+                    } else {
+                        // Ma nay dang thuoc ve dia diem khac. Khong ghi de,
+                        // cung khong im lang - bao ra de nguoi nhap biet.
+                        $ketQua['dung_do']++;
+                        $dungDo[] = $ma;
+                    }
 
                     continue;
                 }
@@ -143,6 +162,13 @@ class NhapDatBanNightify extends Command
         $this->line('Bo qua (da co)  : '.$ketQua['bo_qua']);
         $this->line('Khong khop ban  : '.$ketQua['thieu_ban']);
         $this->line('Dong loi        : '.$ketQua['loi']);
+        $this->line('Trung ma quan khac: '.$ketQua['dung_do']);
+
+        if ($ketQua['dung_do']) {
+            $this->error('Ma dung do voi dia diem khac (bo qua, khong ghi de): '
+                .implode(', ', array_slice($dungDo, 0, 10))
+                .($ketQua['dung_do'] > 10 ? ' ... va '.($ketQua['dung_do'] - 10).' ma nua' : ''));
+        }
 
         if ($banThieu) {
             $this->warn('Ma ban khong co trong he thong: '.collect($banThieu)
