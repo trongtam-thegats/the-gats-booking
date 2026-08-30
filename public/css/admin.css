@@ -591,11 +591,29 @@ rect:focus-visible, g:focus-visible { outline: 2px solid var(--gold); outline-of
     .range-presets a { flex: 1; text-align: center; }
 }
 
-/* Hang cac o tich cua bo loc, tu xuong dong khi het cho. */
-.chip-row {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 10px 18px;
+/* Thanh loc: nhieu o tha xuong xep thanh mot hang gon, chon la chay luon.
+   O hep hon form thuong vi noi dung chi la vai chu, khong phai cau van. */
+.filter-row {
+    grid-template-columns: repeat(auto-fit, minmax(158px, 1fr));
+    gap: 10px 12px;
 }
 
-.chip-row .check { font-size: 13.5px; }
+.filter-row label {
+    font-size: 11.5px;
+    letter-spacing: .02em;
+    text-transform: uppercase;
+    opacity: .75;
+}
+
+.filter-row select,
+.filter-row input {
+    padding: 7px 10px;
+    font-size: 13.5px;
+}
+
+/* O nao dang loc thi sang len, de liec mot cai la biet dang loc theo gi. */
+.filter-row select.dang-loc,
+.filter-row input.dang-loc {
+    border-color: var(--gold);
+    color: var(--gold-soft);
+}

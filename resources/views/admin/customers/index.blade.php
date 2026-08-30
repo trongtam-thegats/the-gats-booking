@@ -265,111 +265,114 @@
         </div>
     </div>
 
-    {{-- Bo loc --}}
+    {{-- Bo loc: mot hang cac o tha xuong, chon la chay luon. --}}
     <div class="card">
-        <div class="page-head" style="margin-bottom:10px">
-            <h2 style="margin:0">Bộ lọc</h2>
-            @if ($dangLoc)
-                <a class="btn btn-ghost btn-sm" href="{{ route('admin.customers.index', array_filter(['branch' => $branch?->id])) }}">Bỏ hết lọc</a>
-            @endif
-        </div>
-
-        <form method="get" class="form-grid">
+        <form method="get" class="form-grid filter-row">
             @include('admin.partials.branch-filter')
 
             <div class="field">
                 <label for="tim">Tìm khách</label>
-                <input type="search" id="tim" name="tim" value="{{ $loc['tim'] ?? '' }}" placeholder="Tên hoặc số điện thoại">
+                <input type="search" id="tim" name="tim" class="@if (! empty($loc['tim'])) dang-loc @endif" value="{{ $loc['tim'] ?? '' }}"
+                       placeholder="Tên hoặc số điện thoại">
             </div>
+
+            <div class="field">
+                <label for="tinh-trang">Tình trạng</label>
+                <select id="tinh-trang" name="tinh-trang" class="@if (! empty($loc['segment'])) dang-loc @endif" onchange="this.form.submit()">
+                    <option value="">Tất cả tình trạng</option>
+                    @foreach (Insight::TINH_TRANG as $ma => $nhan)
+                        <option value="{{ $ma }}" @selected(in_array($ma, $loc['segment'] ?? [], true))>
+                            {{ $nhan }} ({{ number_format($nhomTinhTrang[$ma] ?? 0) }})
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div class="field">
+                <label for="xem-xet">Xem xét</label>
+                <select id="xem-xet" name="xem-xet" class="@if (! empty($loc['review'])) dang-loc @endif" onchange="this.form.submit()">
+                    <option value="">Tất cả</option>
+                    @foreach (Insight::XEM_XET as $ma => $nhan)
+                        <option value="{{ $ma }}" @selected(in_array($ma, $loc['review'] ?? [], true))>
+                            {{ $nhan }} ({{ number_format($nhomXemXet[$ma] ?? 0) }})
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+
+            @if ($hangThe->count() > 1)
+                <div class="field">
+                    <label for="hang-the">Hạng thẻ</label>
+                    <select id="hang-the" name="hang-the" class="@if (! empty($loc['tier'])) dang-loc @endif" onchange="this.form.submit()">
+                        <option value="">Tất cả hạng</option>
+                        @foreach ($hangThe as $hang => $so)
+                            <option value="{{ $hang }}" @selected(in_array((string) $hang, $loc['tier'] ?? [], true))>
+                                {{ $hang }} ({{ number_format($so) }})
+                            </option>
+                        @endforeach
+                    </select>
+                </div>
+            @endif
+
+            <div class="field">
+                <label for="so-lan">Số lần ghé</label>
+                <select id="so-lan" name="so-lan" class="@if (! empty($loc['visits_min'])) dang-loc @endif" onchange="this.form.submit()">
+                    <option value="">Không giới hạn</option>
+                    @foreach (Ctl::MOC_SO_LAN as $moc => $nhan)
+                        <option value="{{ $moc }}" @selected(($loc['visits_min'] ?? null) == $moc)>{{ $nhan }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div class="field">
+                <label for="chi-tu">Chi tiêu</label>
+                <select id="chi-tu" name="chi-tu" class="@if (! empty($loc['spend_min'])) dang-loc @endif" onchange="this.form.submit()">
+                    <option value="">Không giới hạn</option>
+                    @foreach (Ctl::MOC_CHI_TIEU as $moc => $nhan)
+                        <option value="{{ $moc }}" @selected(($loc['spend_min'] ?? null) == $moc)>{{ $nhan }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div class="field">
+                <label for="vang-tu">Thời gian vắng</label>
+                <select id="vang-tu" name="vang-tu" class="@if (! empty($loc['vang_min'])) dang-loc @endif" onchange="this.form.submit()">
+                    <option value="">Không giới hạn</option>
+                    @foreach (Ctl::MOC_VANG as $moc => $nhan)
+                        <option value="{{ $moc }}" @selected(($loc['vang_min'] ?? null) == $moc)>{{ $nhan }}</option>
+                    @endforeach
+                </select>
+            </div>
+
+            <div class="field">
+                <label for="dat-ban">Đặt bàn</label>
+                <select id="dat-ban" name="dat-ban" class="@if (! empty($loc['co_dat_ban']) || ! empty($loc['co_vang_mat'])) dang-loc @endif" onchange="this.form.submit()">
+                    <option value="">Tất cả</option>
+                    @foreach (Ctl::MOC_DAT_BAN as $ma => $nhan)
+                        <option value="{{ $ma }}"
+                            @selected(($ma === 'co' && ! empty($loc['co_dat_ban'])) || ($ma === 'vang' && ! empty($loc['co_vang_mat'])))>
+                            {{ $nhan }}
+                        </option>
+                    @endforeach
+                </select>
+            </div>
+
             <div class="field">
                 <label for="sap-xep">Xếp theo</label>
-                <select id="sap-xep" name="sap-xep">
+                <select id="sap-xep" name="sap-xep" onchange="this.form.submit()">
                     @foreach (Ctl::SAP_XEP as $ma => $nhan)
                         <option value="{{ $ma }}" @selected($sapXep === $ma)>{{ $nhan }}</option>
                     @endforeach
                 </select>
             </div>
+
             <div class="field">
                 <label for="so-luong">Hiện tối đa</label>
-                <select id="so-luong" name="so-luong">
+                <select id="so-luong" name="so-luong" onchange="this.form.submit()">
                     @foreach ([50, 100, 200, 500] as $n)
                         <option value="{{ $n }}" @selected($soLuong === $n)>{{ $n }} khách</option>
                     @endforeach
                 </select>
-            </div>
-
-            <div class="field full">
-                <label>Tình trạng khách</label>
-                <div class="chip-row">
-                    @foreach (Insight::TINH_TRANG as $ma => $nhan)
-                        <label class="check">
-                            <input type="checkbox" name="segment[]" value="{{ $ma }}"
-                                   @checked(in_array($ma, $loc['segment'] ?? [], true))>
-                            {{ $nhan }} <span class="muted">({{ number_format($nhomTinhTrang[$ma] ?? 0) }})</span>
-                        </label>
-                    @endforeach
-                </div>
-            </div>
-
-            <div class="field full">
-                <label>Trạng thái xem xét</label>
-                <div class="chip-row">
-                    @foreach (Insight::XEM_XET as $ma => $nhan)
-                        <label class="check">
-                            <input type="checkbox" name="review[]" value="{{ $ma }}"
-                                   @checked(in_array($ma, $loc['review'] ?? [], true))>
-                            {{ $nhan }} <span class="muted">({{ number_format($nhomXemXet[$ma] ?? 0) }})</span>
-                        </label>
-                    @endforeach
-                </div>
-            </div>
-
-            @if ($hangThe->count() > 1)
-                <div class="field full">
-                    <label>Hạng thẻ</label>
-                    <div class="chip-row">
-                        @foreach ($hangThe as $hang => $so)
-                            <label class="check">
-                                <input type="checkbox" name="tier[]" value="{{ $hang }}"
-                                       @checked(in_array((string) $hang, $loc['tier'] ?? [], true))>
-                                {{ $hang }} <span class="muted">({{ number_format($so) }})</span>
-                            </label>
-                        @endforeach
-                    </div>
-                </div>
-            @endif
-
-            <div class="field">
-                <label for="so-lan">Ghé ít nhất</label>
-                <input type="number" id="so-lan" name="so-lan" min="1" step="1"
-                       value="{{ $loc['visits_min'] ?? '' }}" placeholder="ví dụ 5 lần">
-            </div>
-            <div class="field">
-                <label for="chi-tu">Chi tiêu từ</label>
-                <input type="number" id="chi-tu" name="chi-tu" min="0" step="1000000"
-                       value="{{ isset($loc['spend_min']) ? (int) $loc['spend_min'] : '' }}" placeholder="ví dụ 5000000">
-            </div>
-            <div class="field">
-                <label for="vang-tu">Vắng từ</label>
-                <input type="number" id="vang-tu" name="vang-tu" min="1" step="1"
-                       value="{{ isset($loc['vang_min']) ? (int) $loc['vang_min'] : '' }}" placeholder="ví dụ 30 ngày">
-            </div>
-
-            <div class="field full">
-                <div class="chip-row">
-                    <label class="check">
-                        <input type="checkbox" name="co-dat-ban" value="1" @checked(! empty($loc['co_dat_ban']))>
-                        Từng đặt bàn qua hệ thống
-                    </label>
-                    <label class="check">
-                        <input type="checkbox" name="co-vang-mat" value="1" @checked(! empty($loc['co_vang_mat']))>
-                        Từng đặt bàn rồi không đến
-                    </label>
-                </div>
-            </div>
-
-            <div class="field full">
-                <button class="btn" type="submit">Lọc</button>
             </div>
         </form>
     </div>
@@ -382,7 +385,12 @@
                     <span class="muted" style="font-weight:400">— đang hiện {{ number_format($khach->count()) }}</span>
                 @endif
             </h2>
-            <span class="muted small">Tổng chi tiêu nhóm này: <b>{{ number_format($tienKhopLoc) }}đ</b></span>
+            <span class="muted small">
+                Tổng chi tiêu nhóm này: <b>{{ number_format($tienKhopLoc) }}đ</b>
+                @if ($dangLoc)
+                    &nbsp;<a href="{{ route('admin.customers.index', array_filter(['branch' => $branch?->id])) }}">Bỏ lọc</a>
+                @endif
+            </span>
         </div>
 
         @if ($khach->isEmpty())

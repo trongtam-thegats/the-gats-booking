@@ -121,8 +121,34 @@ class CustomerInsightController extends AdminController
         );
     }
 
+    /** Cac muc chon san cua o "ghe it nhat". */
+    public const MOC_SO_LAN = [2 => 'Từ 2 lần', 5 => 'Từ 5 lần', 10 => 'Từ 10 lần', 20 => 'Từ 20 lần'];
+
+    /** Cac muc chon san cua o "chi tieu tu". */
+    public const MOC_CHI_TIEU = [
+        1000000 => 'Từ 1 triệu',
+        5000000 => 'Từ 5 triệu',
+        10000000 => 'Từ 10 triệu',
+        50000000 => 'Từ 50 triệu',
+    ];
+
+    /** Cac muc chon san cua o "vang tu". */
+    public const MOC_VANG = [
+        30 => 'Vắng từ 30 ngày',
+        60 => 'Vắng từ 60 ngày',
+        90 => 'Vắng từ 90 ngày',
+        180 => 'Vắng từ 180 ngày',
+    ];
+
+    /** Lien quan den dat ban. */
+    public const MOC_DAT_BAN = ['co' => 'Từng đặt bàn', 'vang' => 'Từng đặt rồi không đến'];
+
     /**
      * Bo loc lay tu dia chi trang, da lam sach.
+     *
+     * Moi o deu la mot lua chon don de thanh mot hang thanh gon, chon la chay
+     * luon. Ben duoi service van nhan mang, nen sau nay muon cho chon nhieu
+     * gia tri thi khong phai sua gi them.
      *
      * @return array<string, mixed>
      */
@@ -130,31 +156,42 @@ class CustomerInsightController extends AdminController
     {
         $loc = [];
 
-        foreach (['segment' => CustomerInsightService::TINH_TRANG, 'review' => CustomerInsightService::XEM_XET] as $khoa => $hopLe) {
-            $gt = array_filter((array) $request->query($khoa, []), fn ($x) => isset($hopLe[$x]));
+        $chon = [
+            'segment' => ['tinh-trang', CustomerInsightService::TINH_TRANG],
+            'review' => ['xem-xet', CustomerInsightService::XEM_XET],
+        ];
 
-            if ($gt) {
-                $loc[$khoa] = array_values($gt);
+        foreach ($chon as $khoa => [$thamSo, $hopLe]) {
+            $gt = (string) $request->query($thamSo, '');
+
+            if (isset($hopLe[$gt])) {
+                $loc[$khoa] = [$gt];
             }
         }
 
-        if ($hang = array_filter((array) $request->query('tier', []))) {
-            $loc['tier'] = array_values(array_map('strval', $hang));
+        if ($hang = trim((string) $request->query('hang-the', ''))) {
+            $loc['tier'] = [$hang];
         }
 
-        foreach (['visits_min' => 'so-lan', 'spend_min' => 'chi-tu', 'vang_min' => 'vang-tu'] as $khoa => $thamSo) {
-            $gt = $request->query($thamSo);
+        $moc = [
+            'visits_min' => ['so-lan', self::MOC_SO_LAN],
+            'spend_min' => ['chi-tu', self::MOC_CHI_TIEU],
+            'vang_min' => ['vang-tu', self::MOC_VANG],
+        ];
 
-            if ($gt !== null && $gt !== '' && is_numeric($gt) && (float) $gt > 0) {
-                $loc[$khoa] = (float) $gt;
+        foreach ($moc as $khoa => [$thamSo, $hopLe]) {
+            $gt = (int) $request->query($thamSo, 0);
+
+            if (isset($hopLe[$gt])) {
+                $loc[$khoa] = $gt;
             }
         }
 
-        if ($request->boolean('co-dat-ban')) {
+        $datBan = (string) $request->query('dat-ban', '');
+
+        if ($datBan === 'co') {
             $loc['co_dat_ban'] = true;
-        }
-
-        if ($request->boolean('co-vang-mat')) {
+        } elseif ($datBan === 'vang') {
             $loc['co_vang_mat'] = true;
         }
 
