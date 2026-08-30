@@ -59,8 +59,11 @@ nhận đơn từ web không". Lọc bằng `whereHas` đơn thuần sẽ loại
 loạt test.
 
 **Đêm kinh doanh.** Quán đóng cửa sau nửa đêm, nên mọi mốc giờ quy về số phút tính từ 00:00 của đêm
-đó; giờ nhỏ hơn giờ mở cửa thì cộng 1440. **Giờ đóng cửa và giờ chốt nhận đặt bàn là hai thứ khác
-nhau** (`branches.last_booking_time`).
+đó; giờ nhỏ hơn giờ mở cửa thì thuộc rạng sáng hôm sau. **`Branch::thoiDiemTrongDem()` là nguồn duy
+nhất của quy tắc này** — `Booking::startsAt()` và `AvailabilityService::slotStartsAt()` đều gọi về đó.
+Đừng tự tính lại ở chỗ khác: đã từng có hai bản sao lệch nhau, làm khách đặt ca 01:00 không tự hủy
+được và không nhận được tin nhắc lịch, suốt một thời gian dài mà không ai phát hiện.
+**Giờ đóng cửa và giờ chốt nhận đặt bàn là hai thứ khác nhau** (`branches.last_booking_time`).
 
 **Số điện thoại luôn đi qua `App\Support\SoDienThoai::chuan()`** — số Việt Nam về `0xxx`, số nước
 ngoài giữ `+ma`. Ba nguồn dữ liệu (đặt bàn, hoá đơn POS, thẻ khách POS) chỉ ghép được với nhau nhờ

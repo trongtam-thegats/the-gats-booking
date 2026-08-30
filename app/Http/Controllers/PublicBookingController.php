@@ -8,10 +8,10 @@ use App\Models\Branch;
 use App\Models\Brand;
 use App\Services\AvailabilityService;
 use App\Services\BookingService;
+use App\Support\SoDienThoai;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
-use Illuminate\Validation\Rule;
 
 /**
  * Trang khach. Quan da duoc middleware ResolveBrandSite xac dinh tu ten mien,
@@ -165,6 +165,8 @@ class PublicBookingController extends Controller
             'start_time' => 'giờ',
         ]);
 
+        $data['customer_phone'] = SoDienThoai::chuan($data['customer_phone']);
+
         try {
             $booking = $this->bookings->create($branch, $data);
         } catch (BookingUnavailableException $e) {
@@ -209,17 +211,24 @@ class PublicBookingController extends Controller
     {
         $brand = $this->brand($request);
         $code = trim((string) $request->query('code'));
-        $phone = trim((string) $request->query('phone'));
+        $rawPhone = trim((string) $request->query('phone'));
+        $phone = SoDienThoai::chuan($rawPhone);
         $booking = null;
         $error = null;
 
-        if ($code !== '' || $phone !== '') {
+        // Form bat buoc ca hai o, may chu cung phai bat buoc: chi co ma dat ban
+        // thi khong duoc tra ve don, khong thi do ma la doc duoc don nguoi khac.
+        if ($code !== '' && $phone !== '') {
             $booking = Booking::where('code', strtoupper($code))
-                ->where('customer_phone', $phone)
+                // Don cu luu so nguyen van khach go, don moi luu so da chuan hoa.
+                ->where(fn ($sub) => $sub->where('customer_phone', $phone)
+                    ->orWhere('customer_phone', $rawPhone))
                 ->whereHas('branch', fn ($q) => $q->where('brand_id', $brand->id))
                 ->first();
 
             $error = $booking ? null : __('booking.lookup.not_found');
+        } elseif ($code !== '' || $rawPhone !== '') {
+            $error = __('booking.lookup.not_found');
         }
 
         return view('public.lookup', compact('brand', 'booking', 'code', 'phone', 'error'));
@@ -235,7 +244,10 @@ class PublicBookingController extends Controller
             'reason' => ['nullable', 'string', 'max:200'],
         ]);
 
-        if ($data['customer_phone'] !== $booking->customer_phone) {
+        $inputPhone = SoDienThoai::chuan($data['customer_phone']);
+        $bookingPhone = SoDienThoai::chuan($booking->customer_phone);
+
+        if ($inputPhone !== $bookingPhone && $data['customer_phone'] !== $booking->customer_phone) {
             return back()->withErrors(['customer_phone' => __('booking.errors.phone_mismatch')]);
         }
 

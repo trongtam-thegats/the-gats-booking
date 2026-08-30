@@ -25,7 +25,11 @@ class SendBookingReminders extends Command
 
         $bookings = Booking::query()
             ->where('status', Booking::STATUS_CONFIRMED)
-            ->whereIn('booking_date', [$now->toDateString(), $until->toDateString()])
+            ->whereIn('booking_date', [
+                $now->copy()->subDay()->toDateString(),
+                $now->toDateString(),
+                $until->toDateString(),
+            ])
             ->with(['branch', 'diningTables'])
             ->get()
             ->filter(function (Booking $booking) use ($now, $until) {

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Booking;
 use App\Models\Branch;
+use App\Models\BranchClosure;
 use App\Models\DiningTable;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -124,7 +125,7 @@ class AvailabilityService
     /**
      * Tinh tren danh sach lich nghi da doc san, khong cham vao co so du lieu.
      *
-     * @param  Collection<int, \App\Models\BranchClosure>  $closures
+     * @param  Collection<int, BranchClosure>  $closures
      */
     protected function closedIn(Collection $closures, int $open, ?int $startMinutes, ?int $endMinutes): bool
     {
@@ -332,8 +333,7 @@ class AvailabilityService
         int $partySize,
         ?int $areaId = null,
         bool $onlineOnly = false,
-    ): array
-    {
+    ): array {
         $open = $this->openMinutes($branch);
         $now = Carbon::now();
         $earliest = $now->copy()->addMinutes((int) $branch->min_lead_minutes);
@@ -393,14 +393,7 @@ class AvailabilityService
     /** Thoi diem thuc te cua mot moc gio (co tinh truong hop qua nua dem). */
     public function slotStartsAt(string $date, string $time, int $openMinutes): Carbon
     {
-        $minutes = $this->toMinutes($time);
-        $day = Carbon::parse($date);
-
-        if ($minutes < $openMinutes) {
-            $day->addDay();
-        }
-
-        return $day->setTime(intdiv($minutes, 60), $minutes % 60);
+        return Branch::thoiDiemTrongDem($date, $time, $openMinutes);
     }
 
     /**

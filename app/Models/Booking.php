@@ -7,15 +7,21 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
 class Booking extends Model
 {
     public const STATUS_PENDING = 'pending';
+
     public const STATUS_CONFIRMED = 'confirmed';
+
     public const STATUS_SEATED = 'seated';
+
     public const STATUS_COMPLETED = 'completed';
+
     public const STATUS_CANCELLED = 'cancelled';
+
     public const STATUS_NO_SHOW = 'no_show';
 
     /** Cac trang thai van con giu ban -> tinh vao suc chua. */
@@ -132,10 +138,19 @@ class Booking extends Model
         return $this->startsAt()->isFuture();
     }
 
-    public function startsAt(): \Illuminate\Support\Carbon
+    /**
+     * Thoi diem bat dau that su cua don.
+     *
+     * Quan dong cua sau nua dem nen gio nho hon gio mo cua thuoc rang sang hom
+     * sau - don 01:00 cua dem 30/8 dien ra luc 01:00 ngay 31/8. Quy tac nam o
+     * Branch de ca he thong chi co mot ban.
+     */
+    public function startsAt(): Carbon
     {
-        return \Illuminate\Support\Carbon::parse(
-            $this->booking_date->format('Y-m-d').' '.substr((string) $this->start_time, 0, 5)
+        return Branch::thoiDiemTrongDem(
+            $this->booking_date,
+            (string) $this->start_time,
+            $this->branch?->openMinutes() ?? 0
         );
     }
 
