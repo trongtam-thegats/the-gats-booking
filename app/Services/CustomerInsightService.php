@@ -103,17 +103,18 @@ class CustomerInsightService
      * @param  array<int>|null  $branchIds
      * @return array<string, mixed>
      */
-    public function overview(?array $branchIds, ?Carbon $tuNgay = null): array
+    public function overview(?array $branchIds, ?Carbon $tuNgay = null, ?Carbon $denNgay = null): array
     {
         $hoaDon = Invoice::query()->choDiaDiem($branchIds)->thanhCong()
-            ->when($tuNgay, fn ($q) => $q->where('paid_at', '>=', $tuNgay));
+            ->when($tuNgay, fn ($q) => $q->where('paid_at', '>=', $tuNgay))
+            ->when($denNgay, fn ($q) => $q->where('paid_at', '<', $denNgay));
 
         $tong = (clone $hoaDon)->count();
         $coSdt = (clone $hoaDon)->coKhach()->count();
         $doanhThu = (float) (clone $hoaDon)->sum('total');
         $doanhThuNhanDien = (float) (clone $hoaDon)->coKhach()->sum('total');
 
-        $khach = $this->tongHopHoaDon($branchIds, $tuNgay);
+        $khach = $this->tongHopHoaDon($branchIds, $tuNgay, $denNgay);
         $quayLai = $khach->filter(fn ($k) => $k['visits'] >= 2);
 
         return [
@@ -129,6 +130,21 @@ class CustomerInsightService
             'first_paid_at' => (clone $hoaDon)->min('paid_at'),
             'last_paid_at' => (clone $hoaDon)->max('paid_at'),
         ];
+    }
+
+    /**
+     * Hoa don som nhat, de biet du lieu bat dau tu bao gio.
+     *
+     * Can cho viec so sanh hai ky: neu ky truoc roi vao khoang chua co du lieu
+     * thi moi con so tang giam deu la bia, phai bao la chua du de so.
+     *
+     * @param  array<int>|null  $branchIds
+     */
+    public function ngaySomNhat(?array $branchIds): ?Carbon
+    {
+        $som = Invoice::query()->choDiaDiem($branchIds)->thanhCong()->min('paid_at');
+
+        return $som ? Carbon::parse($som) : null;
     }
 
     /**
@@ -473,7 +489,7 @@ class CustomerInsightService
      * @param  array<int>|null  $branchIds
      * @return Collection<string, array<string, mixed>>
      */
-    protected function tongHopHoaDon(?array $branchIds, ?Carbon $tuNgay = null): Collection
+    protected function tongHopHoaDon(?array $branchIds, ?Carbon $tuNgay = null, ?Carbon $denNgay = null): Collection
     {
         // Lan ghe dau tien tinh tren TOAN BO lich su, khong theo khoang dang xem.
         // Neu khong thi xem "1 thang gan nhat" se thay ai cung la khach moi,
@@ -485,6 +501,7 @@ class CustomerInsightService
             ->thanhCong()
             ->coKhach()
             ->when($tuNgay, fn ($q) => $q->where('paid_at', '>=', $tuNgay))
+            ->when($denNgay, fn ($q) => $q->where('paid_at', '<', $denNgay))
             ->selectRaw('customer_phone, MAX(customer_name) as ten, COUNT(*) as so_lan, '
                 .'SUM(total) as tong_chi, SUM(tip) as tong_tip, '
                 .'MIN(paid_at) as lan_dau, MAX(paid_at) as lan_cuoi, '

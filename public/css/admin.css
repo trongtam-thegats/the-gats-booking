@@ -617,3 +617,15 @@ rect:focus-visible, g:focus-visible { outline: 2px solid var(--gold); outline-of
     border-color: var(--gold);
     color: var(--gold-soft);
 }
+
+/* Muc tang giam so voi ky truoc, hien duoi con so cua o thong ke. */
+.delta {
+    /* Dong rieng, khong dinh vao duoi cau chu thich phia tren. */
+    display: block;
+    margin-top: 3px;
+    font-size: 12.5px;
+    font-weight: 600;
+}
+.delta.tang { color: var(--ok); }
+.delta.giam { color: var(--danger); }
+.delta.bang { color: var(--muted); font-weight: 500; }

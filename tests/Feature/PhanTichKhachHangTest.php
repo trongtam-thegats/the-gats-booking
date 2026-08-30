@@ -424,6 +424,55 @@ class PhanTichKhachHangTest extends TestCase
         $this->assertNotSame('khach_moi', $motThang['segment']);
     }
 
+    public function test_so_sanh_voi_ky_truoc_khi_du_du_lieu(): void
+    {
+        // Ky truoc (2-1 thang truoc): 1 khach. Ky nay (1 thang gan nhat): 2 khach.
+        $this->hoaDon('0900000030', now()->subDays(200)->toDateTimeString(), 100000);
+        $this->hoaDon('0900000031', now()->subDays(45)->toDateTimeString(), 100000);
+        $this->hoaDon('0900000032', now()->subDays(10)->toDateTimeString(), 100000);
+        $this->hoaDon('0900000033', now()->subDays(5)->toDateTimeString(), 100000);
+
+        $trang = $this->actingAs($this->admin)->get('/quan-ly/khach-hang?khoang=1');
+        $trang->assertOk();
+
+        $soSanh = $trang->viewData('soSanh');
+
+        $this->assertTrue($soSanh['du_du_lieu']);
+        $this->assertSame(2, $trang->viewData('tongQuan')['customers']);
+        $this->assertSame(1, $soSanh['truoc']['customers']);
+        $this->assertSame(100.0, $soSanh['thay_doi']['customers']);
+    }
+
+    public function test_ky_truoc_thieu_du_lieu_thi_tang_giam_bang_khong(): void
+    {
+        // Du lieu chi bat dau tu 40 ngay truoc, nen "6 thang truoc do" khong
+        // co gi de so - khong duoc bia ra mot muc tang khong lo.
+        $this->hoaDon('0900000034', now()->subDays(40)->toDateTimeString(), 100000);
+        $this->hoaDon('0900000035', now()->subDays(20)->toDateTimeString(), 100000);
+        $this->hoaDon('0900000036', now()->subDays(3)->toDateTimeString(), 100000);
+
+        $trang = $this->actingAs($this->admin)->get('/quan-ly/khach-hang?khoang=6');
+        $trang->assertOk();
+
+        $soSanh = $trang->viewData('soSanh');
+
+        $this->assertFalse($soSanh['du_du_lieu']);
+
+        foreach ($soSanh['thay_doi'] as $pt) {
+            $this->assertSame(0.0, $pt);
+        }
+    }
+
+    public function test_khong_chon_khoang_thi_khong_co_so_sanh(): void
+    {
+        $this->hoaDon('0900000037', now()->subDays(5)->toDateTimeString(), 100000);
+
+        $trang = $this->actingAs($this->admin)->get('/quan-ly/khach-hang');
+
+        $trang->assertOk();
+        $this->assertNull($trang->viewData('soSanh'));
+    }
+
     public function test_quan_ly_chi_thay_hoa_don_cua_quan_minh(): void
     {
         $brandB = Brand::create([

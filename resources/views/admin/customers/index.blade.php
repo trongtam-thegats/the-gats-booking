@@ -47,6 +47,28 @@
 
     $dangLoc = ! empty($loc);
 
+    /**
+     * Nhan tang giam cua mot chi so so voi ky truoc.
+     * Khong co ky truoc de so thi khong hien gi ca.
+     */
+    $nhanDoi = function (string $khoa) use ($soSanh) {
+        if (! $soSanh) {
+            return null;
+        }
+
+        $pt = $soSanh['thay_doi'][$khoa] ?? 0.0;
+        $lop = $pt > 0 ? 'tang' : ($pt < 0 ? 'giam' : 'bang');
+        $mui = $pt > 0 ? '▲' : ($pt < 0 ? '▼' : '');
+
+        return [
+            'lop' => $lop,
+            'chu' => trim($mui.' '.number_format(abs($pt), 1, ',', '.').'%'),
+            'chuThich' => $soSanh['du_du_lieu']
+                ? 'So với '.$soSanh['tu']->format('d/m/Y').' – '.$soSanh['den']->format('d/m/Y')
+                : 'Kỳ trước chưa có đủ dữ liệu để so sánh nên tạm tính là 0%',
+        ];
+    };
+
     // --- Bieu do 1: co cau khach theo tinh trang ---------------------------
     $mauCot = [
         'deu_dan' => '#6fbf7a',
@@ -299,6 +321,13 @@
             (từ {{ $tuNgay->format('d/m/Y') }}): số lần ghé, chi tiêu, nhịp ghé và tình trạng.
             Riêng "khách mới" vẫn tính theo lần ghé đầu tiên trong toàn bộ lịch sử, nên khách gắn bó
             lâu năm không bị gọi nhầm là mới.
+            @if ($soSanh)
+                @if ($soSanh['du_du_lieu'])
+                    Mức tăng giảm so với {{ $soSanh['tu']->format('d/m/Y') }} – {{ $soSanh['den']->format('d/m/Y') }}.
+                @else
+                    <b>Kỳ trước chưa có đủ dữ liệu</b> nên mức tăng giảm tạm tính là 0%.
+                @endif
+            @endif
         </p>
     @endif
 
@@ -307,6 +336,9 @@
             <span>Khách nhận diện được</span>
             <b>{{ number_format($tongQuan['customers']) }}</b>
             <small class="muted">trong {{ number_format($tongQuan['invoices']) }} hóa đơn</small>
+            @if ($doi = $nhanDoi('customers'))
+                <span class="delta {{ $doi['lop'] }}" title="{{ $doi['chuThich'] }}">{{ $doi['chu'] }}</span>
+            @endif
         </div>
         <div class="stat accent">
             <span>Khách quay lại</span>
@@ -315,10 +347,16 @@
                 {{ $tongQuan['customers'] ? round($tongQuan['returning'] / $tongQuan['customers'] * 100) : 0 }}%
                 — từ 2 hóa đơn trở lên
             </small>
+            @if ($doi = $nhanDoi('returning'))
+                <span class="delta {{ $doi['lop'] }}" title="{{ $doi['chuThich'] }}">{{ $doi['chu'] }}</span>
+            @endif
         </div>
         <div class="stat">
             <span>Chi tiêu của khách quay lại</span>
             <b style="font-size:22px">{{ $tienGon($tongQuan['returning_revenue']) }}</b>
+            @if ($doi = $nhanDoi('returning_revenue'))
+                <span class="delta {{ $doi['lop'] }}" title="{{ $doi['chuThich'] }}">{{ $doi['chu'] }}</span>
+            @endif
         </div>
         <div class="stat">
             <span>Chưa xem xét</span>

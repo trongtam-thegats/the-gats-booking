@@ -7,6 +7,7 @@ use App\Models\Invoice;
 use App\Models\PosCustomer;
 use App\Services\CustomerInsightService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
 
 /**
@@ -47,10 +48,13 @@ class CustomerInsightController extends AdminController
         $tatCa = $this->insight->tatCaKhach($branchIds, $tuNgay);
         $daLoc = $this->insight->locVaXep($tatCa, $sapXep, $loc);
 
+        $tongQuan = $this->insight->overview($branchIds, $tuNgay);
+
         return view('admin.customers.index', [
+            'soSanh' => $this->soSanhKyTruoc($branchIds, $khoang, $tuNgay, $tongQuan),
             'branches' => $branches,
             'branch' => $branch,
-            'tongQuan' => $this->insight->overview($branchIds, $tuNgay),
+            'tongQuan' => $tongQuan,
             'khoang' => $khoang,
             'tuNgay' => $tuNgay,
             'tatCa' => $tatCa,
@@ -162,6 +166,66 @@ class CustomerInsightController extends AdminController
 
     /** Lien quan den dat ban. */
     public const MOC_DAT_BAN = ['co' => 'Từng đặt bàn', 'vang' => 'Từng đặt rồi không đến'];
+
+    /**
+     * So sanh voi ky lien truoc co cung do dai.
+     *
+     * Chi so sanh khi ky truoc nam tron trong khoang da co du lieu. Drinking
+     * Healing moi co chin thang hoa don; dem "12 thang nay so voi 12 thang
+     * truoc" o do se ra muc tang gap may lan, hoan toan la bia.
+     *
+     * @param  array<int>|null  $branchIds
+     * @return array<string, mixed>|null
+     */
+    protected function soSanhKyTruoc(?array $branchIds, int $khoang, ?Carbon $tuNgay, array $nay): ?array
+    {
+        if (! $khoang || ! $tuNgay) {
+            return null;
+        }
+
+        $batDauKyTruoc = $tuNgay->copy()->subMonths($khoang);
+        $som = $this->insight->ngaySomNhat($branchIds);
+        $truoc = $this->insight->overview($branchIds, $batDauKyTruoc, $tuNgay);
+
+        // Ky truoc co nam tron trong khoang da co du lieu khong. Drinking
+        // Healing moi co chin thang hoa don: "6 thang nay so voi 6 thang truoc"
+        // o do ra +4180%, khong phai vi quan bung no ma vi ky truoc gan nhu
+        // rong. Thieu du lieu thi bao tang giam bang 0, khong bia so.
+        $duDuLieu = $som && $som->lte($batDauKyTruoc);
+
+        $chiSo = ['customers', 'returning', 'returning_revenue', 'revenue'];
+        $thayDoi = [];
+
+        foreach ($chiSo as $khoa) {
+            $thayDoi[$khoa] = $duDuLieu
+                ? $this->phanTramDoi((float) $nay[$khoa], (float) $truoc[$khoa])
+                : 0.0;
+        }
+
+        return [
+            'du_du_lieu' => $duDuLieu,
+            'tu' => $batDauKyTruoc,
+            'den' => $tuNgay,
+            'truoc' => $truoc,
+            'thay_doi' => $thayDoi,
+        ];
+    }
+
+    /**
+     * Muc tang giam so voi ky truoc, tinh bang phan tram.
+     *
+     * Ky truoc khong co gi de so thi tra ve 0 chu khong phai vo cuc: mot con
+     * so tang vo han khong noi len dieu gi, ma cho trong thi nguoi doc lai
+     * tuong he thong hong.
+     */
+    protected function phanTramDoi(float $nay, float $truoc): float
+    {
+        if ($truoc <= 0) {
+            return 0.0;
+        }
+
+        return round(($nay - $truoc) / $truoc * 100, 1);
+    }
 
     /**
      * Bo loc lay tu dia chi trang, da lam sach.
