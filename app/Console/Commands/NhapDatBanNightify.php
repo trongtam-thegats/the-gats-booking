@@ -81,9 +81,7 @@ class NhapDatBanNightify extends Command
         $dong = $this->docCsv($tep);
         $this->line('Doc duoc '.count($dong).' dong.');
 
-        $bang = DiningTable::where('branch_id', $branch->id)
-            ->get()
-            ->keyBy(fn (DiningTable $t) => mb_strtoupper(trim((string) $t->code)));
+        $bang = $this->chiMucBan($branch);
 
         $nguoiDung = User::pluck('id', 'email');
         $daCo = Booking::whereIn('code', array_column($dong, 'RESERVATION_CODE'))->pluck('code')->all();
@@ -105,7 +103,7 @@ class NhapDatBanNightify extends Command
                 $ban = [];
 
                 foreach ($banCsv as $code) {
-                    $tim = $bang->get(mb_strtoupper($code));
+                    $tim = $bang[$this->chuanMa($code)] ?? null;
 
                     if ($tim) {
                         $ban[] = $tim;
@@ -156,6 +154,43 @@ class NhapDatBanNightify extends Command
         }
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Ban cua dia diem, tra cuu duoc bang ca ten hien tai lan ten cu.
+     *
+     * Quan doi ten ban theo thoi gian (B1 thanh "Bar 1", K1-K4 gop thanh
+     * "Dining Room") nhung tep xuat tu he thong cu van ghi ten cu.
+     *
+     * @return array<string, DiningTable>
+     */
+    protected function chiMucBan(Branch $branch): array
+    {
+        $ban = DiningTable::where('branch_id', $branch->id)->get();
+        $chiMuc = [];
+
+        foreach ($ban as $mot) {
+            $chiMuc[$this->chuanMa((string) $mot->code)] = $mot;
+        }
+
+        // Ten cu chi dien vao cho trong, khong duoc de len ten dang dung.
+        foreach ($ban as $mot) {
+            foreach (explode(',', (string) $mot->aliases) as $cu) {
+                $cu = $this->chuanMa($cu);
+
+                if ($cu !== '' && ! isset($chiMuc[$cu])) {
+                    $chiMuc[$cu] = $mot;
+                }
+            }
+        }
+
+        return $chiMuc;
+    }
+
+    /** Ma ban bo dau cach va ve chu hoa, de "Bar 1" va "BAR1" la mot. */
+    protected function chuanMa(string $ma): string
+    {
+        return mb_strtoupper((string) preg_replace('/\s+/u', '', trim($ma)));
     }
 
     /**

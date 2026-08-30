@@ -20,7 +20,7 @@ class DiningTable extends Model
 
     protected $fillable = [
         'branch_id', 'area_id', 'code', 'table_type', 'seats_min', 'seats_max',
-        'combinable', 'is_active', 'note', 'sort_order',
+        'combinable', 'is_active', 'note', 'sort_order', 'aliases',
     ];
 
     protected function casts(): array

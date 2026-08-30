@@ -6,49 +6,52 @@ use App\Models\Brand;
 use Illuminate\Database\Seeder;
 
 /**
- * So do cho ngoi that cua Drinking Healing, dung theo ban do quan gui:
- * 24 cho dat duoc, tong 84 cho. Vi tri DJ khong phai ban nen khong khai bao.
+ * So do cho ngoi that cua Drinking Healing (user chot 2026-08-30): 21 ban
+ * trong 4 khu. Vi tri DJ khong phai ban nen khong khai bao.
+ *
+ * Ten ban dung dung ten nhan vien goi hang ngay. Cot "ten cu" giu lai ma cua
+ * he thong dat ban truoc day (B1, S4, K1-K4) de con nhap duoc lich su.
  */
 class DrinkingHealingSeeder extends Seeder
 {
     /**
-     * [ma ban, loai, so cho toi thieu, so cho toi da, cho ghep ban]
+     * [ma ban, ten cu, khu vuc, loai, so cho toi thieu, so cho toi da, cho ghep ban]
      *
-     * @var array<int, array{0: string, 1: string, 2: int, 3: int, 4: bool}>
+     * @var array<int, array{0: string, 1: string, 2: string, 3: string, 4: int, 5: int, 6: bool}>
      */
     protected array $tables = [
         // Ghe quay bar - moi ghe mot khach, ghep duoc voi nhau cho nhom ngoi quay
-        ['B1', 'bar_seat', 1, 1, true],
-        ['B2', 'bar_seat', 1, 1, true],
-        ['B3', 'bar_seat', 1, 1, true],
-        ['B4', 'bar_seat', 1, 1, true],
-        ['B5', 'bar_seat', 1, 1, true],
-        ['B6', 'bar_seat', 1, 1, true],
-        ['B7', 'bar_seat', 1, 1, true],
-        ['B8', 'bar_seat', 1, 1, true],
-        ['B9', 'bar_seat', 1, 1, true],
-        ['B10', 'bar_seat', 1, 1, true],
+        ['Bar 1', 'B1,B01', 'Quầy Bar', 'bar_seat', 1, 1, true],
+        ['Bar 2', 'B2,B02', 'Quầy Bar', 'bar_seat', 1, 1, true],
+        ['Bar 3', 'B3,B03', 'Quầy Bar', 'bar_seat', 1, 1, true],
+        ['Bar 4', 'B4,B04', 'Quầy Bar', 'bar_seat', 1, 1, true],
+        ['Bar 5', 'B5,B05', 'Quầy Bar', 'bar_seat', 1, 1, true],
+        ['Bar 6', 'B6,B06', 'Quầy Bar', 'bar_seat', 1, 1, true],
+        ['Bar 7', 'B7,B07', 'Quầy Bar', 'bar_seat', 1, 1, true],
+        ['Bar 8', 'B8,B08', 'Quầy Bar', 'bar_seat', 1, 1, true],
+        ['Bar 9', 'B9,B09', 'Quầy Bar', 'bar_seat', 1, 1, true],
+        ['Bar 10', 'B10,B010', 'Quầy Bar', 'bar_seat', 1, 1, true],
 
-        // Ban an trong phong K
-        ['K1', 'dining', 2, 4, true],
-        ['K2', 'dining', 2, 4, true],
-        ['K3', 'dining', 2, 4, true],
-        ['K4', 'dining', 2, 4, true],
+        // Bon ban K cu (K1-K4) da duoc quan gop thanh mot ban dai duy nhat.
+        ['Dining Room', 'K1,K2,K3,K4', 'Dining Room', 'dining', 6, 16, false],
 
         // Sofa - khong ghep, moi bo la mot khong gian rieng
-        ['S1', 'sofa', 4, 6, false],
-        ['S2', 'sofa', 5, 8, false],
-        ['S3', 'sofa', 5, 8, false],
-        ['S4', 'sofa', 5, 8, false],
+        ['Sofa 1', 'S1', 'Sofa', 'sofa', 4, 6, false],
+        ['Sofa 2', 'S2', 'Sofa', 'sofa', 5, 8, false],
+        ['Sofa 3', 'S3', 'Sofa', 'sofa', 5, 8, false],
+        ['Sofa 4', 'S4', 'Sofa', 'sofa', 5, 8, false],
 
         // Ban cao
-        ['T1', 'high_table', 2, 4, true],
-        ['T2', 'high_table', 2, 4, true],
-        ['T3', 'high_table', 2, 4, true],
-        ['T4', 'high_table', 4, 6, true],
-        ['T5', 'high_table', 4, 6, true],
-        ['T6', 'high_table', 2, 4, true],
+        ['T1', '', 'Bàn Cao', 'high_table', 2, 4, true],
+        ['T2', '', 'Bàn Cao', 'high_table', 2, 4, true],
+        ['T3', '', 'Bàn Cao', 'high_table', 2, 4, true],
+        ['T4', '', 'Bàn Cao', 'high_table', 4, 6, true],
+        ['T5', '', 'Bàn Cao', 'high_table', 4, 6, true],
+        ['T6', '', 'Bàn Cao', 'high_table', 2, 4, true],
     ];
+
+    /** Thu tu hien thi cua cac khu. */
+    protected array $areas = ['Quầy Bar', 'Dining Room', 'Sofa', 'Bàn Cao'];
 
     public function run(): void
     {
@@ -76,16 +79,21 @@ class DrinkingHealingSeeder extends Seeder
             ]
         );
 
-        $area = $branch->areas()->firstOrCreate(
-            ['name' => 'Khu chính'],
-            ['bookable' => true, 'sort_order' => 1]
-        );
+        $khu = [];
 
-        foreach ($this->tables as $index => [$code, $type, $min, $max, $combinable]) {
+        foreach ($this->areas as $thuTu => $ten) {
+            $khu[$ten] = $branch->areas()->firstOrCreate(
+                ['name' => $ten],
+                ['bookable' => true, 'sort_order' => $thuTu + 1]
+            );
+        }
+
+        foreach ($this->tables as $index => [$code, $tenCu, $ten, $type, $min, $max, $combinable]) {
             $branch->diningTables()->updateOrCreate(
                 ['code' => $code],
                 [
-                    'area_id' => $area->id,
+                    'aliases' => $tenCu ?: null,
+                    'area_id' => $khu[$ten]->id,
                     'table_type' => $type,
                     'seats_min' => $min,
                     'seats_max' => $max,
