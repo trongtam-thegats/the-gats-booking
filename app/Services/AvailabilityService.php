@@ -107,10 +107,27 @@ class AvailabilityService
      */
     public function isClosed(Branch $branch, string $date, ?int $startMinutes = null, ?int $endMinutes = null): bool
     {
-        $open = $this->openMinutes($branch);
+        return $this->closedIn(
+            $this->closuresFor($branch, $date),
+            $this->openMinutes($branch),
+            $startMinutes,
+            $endMinutes
+        );
+    }
 
-        $closures = $branch->closures()->whereDate('date', $date)->get();
+    /** Lich nghi cua mot ngay. Tach rieng de goi mot lan roi dung lai cho ca ngay. */
+    protected function closuresFor(Branch $branch, string $date): Collection
+    {
+        return $branch->closures()->whereDate('date', $date)->get();
+    }
 
+    /**
+     * Tinh tren danh sach lich nghi da doc san, khong cham vao co so du lieu.
+     *
+     * @param  Collection<int, \App\Models\BranchClosure>  $closures
+     */
+    protected function closedIn(Collection $closures, int $open, ?int $startMinutes, ?int $endMinutes): bool
+    {
         foreach ($closures as $closure) {
             if ($closure->isFullDay()) {
                 return true;
@@ -148,7 +165,22 @@ class AvailabilityService
         ?int $ignoreBookingId = null,
         bool $onlineOnly = false,
     ): Collection {
-        $tables = $branch->diningTables()
+        $tables = $this->bookableTables($branch, $areaId, $onlineOnly);
+
+        $busyIds = $this->busyTableIds($branch, $date, $startMinutes, $endMinutes, $ignoreBookingId);
+
+        return $tables->reject(fn (DiningTable $t) => in_array($t->id, $busyIds, true))->values();
+    }
+
+    /**
+     * Cac ban co the xep khach, chua tinh den lich dat. Danh sach nay khong doi
+     * theo khung gio nen chi can doc mot lan cho ca ngay.
+     *
+     * @return Collection<int, DiningTable>
+     */
+    protected function bookableTables(Branch $branch, ?int $areaId = null, bool $onlineOnly = false): Collection
+    {
+        return $branch->diningTables()
             ->where('is_active', true)
             ->when($areaId, fn ($q) => $q->where('area_id', $areaId))
             // Khu vuc tat "nhan dat online" chi danh cho khach goi dien hoac
@@ -160,10 +192,6 @@ class AvailabilityService
             ))
             ->with('area')
             ->get();
-
-        $busyIds = $this->busyTableIds($branch, $date, $startMinutes, $endMinutes, $ignoreBookingId);
-
-        return $tables->reject(fn (DiningTable $t) => in_array($t->id, $busyIds, true))->values();
     }
 
     /**
@@ -178,6 +206,21 @@ class AvailabilityService
         int $endMinutes,
         ?int $ignoreBookingId = null,
     ): array {
+        return $this->busyIdsIn(
+            $this->blockingIntervals($branch, $date, $ignoreBookingId),
+            $startMinutes,
+            $endMinutes
+        );
+    }
+
+    /**
+     * Cac luot dat dang giu ban trong mot dem kinh doanh, da quy ve so phut
+     * va kem san id cac ban. Doc mot lan cho ca ngay thay vi tung khung gio.
+     *
+     * @return array<int, array{start: int, end: int, tables: array<int, int>}>
+     */
+    protected function blockingIntervals(Branch $branch, string $date, ?int $ignoreBookingId = null): array
+    {
         $open = $this->openMinutes($branch);
 
         $bookings = $branch->bookings()
@@ -187,18 +230,39 @@ class AvailabilityService
             ->with('diningTables:id')
             ->get(['id', 'start_time', 'end_time']);
 
-        $busy = [];
+        $intervals = [];
 
         foreach ($bookings as $booking) {
-            $bStart = $this->normalize($this->toMinutes((string) $booking->start_time), $open);
-            $bEnd = $this->normalize($this->toMinutes((string) $booking->end_time), $open);
-            if ($bEnd <= $bStart) {
-                $bEnd += 1440;
+            $start = $this->normalize($this->toMinutes((string) $booking->start_time), $open);
+            $end = $this->normalize($this->toMinutes((string) $booking->end_time), $open);
+            if ($end <= $start) {
+                $end += 1440;
             }
 
-            if ($startMinutes < $bEnd && $bStart < $endMinutes) {
-                foreach ($booking->diningTables as $table) {
-                    $busy[$table->id] = true;
+            $intervals[] = [
+                'start' => $start,
+                'end' => $end,
+                'tables' => $booking->diningTables->pluck('id')->map('intval')->all(),
+            ];
+        }
+
+        return $intervals;
+    }
+
+    /**
+     * Id cac ban dang ban trong khung gio, tinh tren danh sach da doc san.
+     *
+     * @param  array<int, array{start: int, end: int, tables: array<int, int>}>  $intervals
+     * @return array<int, int>
+     */
+    protected function busyIdsIn(array $intervals, int $startMinutes, int $endMinutes): array
+    {
+        $busy = [];
+
+        foreach ($intervals as $interval) {
+            if ($startMinutes < $interval['end'] && $interval['start'] < $endMinutes) {
+                foreach ($interval['tables'] as $id) {
+                    $busy[$id] = true;
                 }
             }
         }
@@ -274,7 +338,15 @@ class AvailabilityService
         $now = Carbon::now();
         $earliest = $now->copy()->addMinutes((int) $branch->min_lead_minutes);
         $isToday = Carbon::parse($date)->isSameDay($now);
-        $closedAllDay = $this->isClosed($branch, $date);
+
+        // Ba truy van cho ca ngay, khong phai ba truy van cho moi khung gio.
+        // Truoc day moi lan khach bam doi ngay hay doi so khach la chay vai chuc
+        // cau lenh; gio la ba, phan con lai tinh trong bo nho.
+        $closures = $this->closuresFor($branch, $date);
+        $tables = $this->bookableTables($branch, $areaId, $onlineOnly);
+        $intervals = $this->blockingIntervals($branch, $date);
+
+        $closedAllDay = $closures->contains(fn ($closure) => $closure->isFullDay());
 
         $result = [];
 
@@ -289,14 +361,15 @@ class AvailabilityService
             if ($closedAllDay) {
                 $available = false;
                 $reason = 'Chi nhánh nghỉ';
-            } elseif ($this->isClosed($branch, $date, $startMin, $endMin)) {
+            } elseif ($this->closedIn($closures, $open, $startMin, $endMin)) {
                 $available = false;
                 $reason = 'Ngoài giờ phục vụ';
             } elseif ($isToday && $this->slotStartsAt($date, $time, $open)->lt($earliest)) {
                 $available = false;
                 $reason = 'Quá sát giờ';
             } else {
-                $free = $this->availableTables($branch, $date, $startMin, $endMin, $areaId, null, $onlineOnly);
+                $busyIds = $this->busyIdsIn($intervals, $startMin, $endMin);
+                $free = $tables->reject(fn (DiningTable $t) => in_array((int) $t->id, $busyIds, true))->values();
                 $picked = $this->pickTables($free, $partySize);
                 $tablesLeft = $free->count();
 

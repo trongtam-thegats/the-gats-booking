@@ -26,9 +26,11 @@ class DatabaseSeeder extends Seeder
             ['email' => 'trongtam@thegats.vn'],
             [
                 'name' => 'Trọng Tâm',
-                'password' => 'ThayMatKhauNgay!2026',
+                // Mat khau khoi tao la chinh email, doi bat buoc o lan dang nhap dau.
+                'password' => 'trongtam@thegats.vn',
                 'role' => Roles::ADMIN,
                 'is_active' => true,
+                'must_change_password' => true,
             ]
         );
 
@@ -78,16 +80,18 @@ class DatabaseSeeder extends Seeder
                 ['email' => 'quanly.'.$brand->slug.'@thegats.vn'],
                 [
                     'name' => 'Quản lý '.$brand->name,
-                    'password' => 'ThayMatKhauNgay!2026',
+                    'password' => 'quanly.'.$brand->slug.'@thegats.vn',
                     'role' => Roles::MANAGER,
                     'brand_id' => $brand->id,
                     'is_active' => true,
+                    'must_change_password' => true,
                 ]
             );
         }
 
         $this->command?->info('Tài khoản quản trị: '.$admin->email);
         $this->command?->info('Tài khoản quản lý: quanly.gemination@thegats.vn, quanly.drinking-healing@thegats.vn');
-        $this->command?->warn('Mật khẩu khởi tạo cho tất cả: ThayMatKhauNgay!2026 — đổi ngay sau lần đăng nhập đầu.');
+        $this->command?->warn('Mật khẩu khởi tạo của mỗi tài khoản chính là email của tài khoản đó; '
+            .'hệ thống bắt đổi ngay sau lần đăng nhập đầu.');
     }
 }

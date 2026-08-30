@@ -13,7 +13,12 @@
     $lastDay = $today->copy()->addDays((int) $branch->max_advance_days);
     $stripDays = collect(range(0, min(13, (int) $branch->max_advance_days)))
         ->map(fn (int $offset) => $today->copy()->addDays($offset));
-    $selectedDate = old('booking_date', $today->toDateString());
+    $selectedDate = $initialDate;
+
+    // Khung gio cua lua chon mac dinh da duoc tinh o controller va in thang ra
+    // HTML. Trang khong phai goi API mot vong nua truoc khi khach thay gio.
+    $initialMessage = $initialSlots['message']
+        ?: (count($initialSlots['slots']) ? __('booking.form.slot_legend') : __('booking.form.no_service_day'));
 
     // Chu dung trong phan JavaScript. Gom o day thay vi nhet thang vao @json
     // vi Blade khong doc duoc mang nhieu dong long ngoac trong doi so directive.
@@ -30,8 +35,12 @@
 @endphp
 
 @section('content')
-    @if ($brand->hasCover())
-        <img class="cover" src="{{ asset($brand->cover_path) }}" alt="{{ $brand->name }}">
+    @if ($cover = $brand->coverSources())
+        {{-- Anh dau trang: tai truoc moi thu khac, va dien thoai chi lay ban hep. --}}
+        <img class="cover" src="{{ $cover['src'] }}" alt="{{ $brand->name }}"
+             @if ($cover['srcset']) srcset="{{ $cover['srcset'] }}" sizes="min(100vw, 760px)" @endif
+             @if ($cover['width']) width="{{ $cover['width'] }}" height="{{ $cover['height'] }}" @endif
+             fetchpriority="high" decoding="async">
     @endif
 
     <section class="hero">
@@ -144,7 +153,7 @@
 
             <input type="number" id="party_size" name="party_size" class="party-custom"
                    min="1" max="{{ $branch->max_party_size }}"
-                   value="{{ old('party_size', 2) }}" required>
+                   value="{{ $initialParty }}" required>
 
             <p class="hint" style="margin:10px 0 0">
                 {!! __('booking.form.party_over_max', [
@@ -165,8 +174,15 @@
                 <span class="step-value" id="value-time"></span>
             </div>
 
-            <div class="hint" id="slot-message" style="margin-bottom:10px">{{ __('booking.form.loading_slots') }}</div>
-            <div class="slots" id="slots"></div>
+            <div class="hint" id="slot-message" style="margin-bottom:10px">{{ $initialMessage }}</div>
+            <div class="slots" id="slots">
+                @foreach ($initialSlots['slots'] as $slot)
+                    <button type="button" class="slot" data-time="{{ $slot['time'] }}"
+                            @disabled(! $slot['available'])
+                            @if ($slot['reason']) title="{{ $slot['reason'] }}" @endif
+                    >{{ $slot['time'] }}</button>
+                @endforeach
+            </div>
 
             @if ($lateNote = $branch->lateNote())
                 <p class="hint" style="margin:12px 0 0">{{ $lateNote }}</p>
@@ -227,6 +243,7 @@
 
     // Chu cho phan chay bang JavaScript, lay tu file ngon ngu de khop voi ban dich.
     const t = @json($jsStrings);
+    const initialSlots = @json($initialSlots);
     const dateInput  = document.getElementById('booking_date');
     const partyInput = document.getElementById('party_size');
     const startTime  = document.getElementById('start_time');
@@ -248,6 +265,12 @@
     const ctaSub     = document.getElementById('cta-sub');
 
     let requestToken = 0;
+    let inFlight = null;
+
+    // Nho lai ket qua da tai trong vong mot phut. Khach hay bam qua bam lai
+    // giua vai ngay; lan quay lai khong can goi may chu nua.
+    const cache = new Map();
+    const CACHE_MS = 60000;
 
     function formatDate(value) {
         const day = daystrip.querySelector('.day[data-date="' + value + '"]');
@@ -301,66 +324,36 @@
         }
     }
 
-    async function loadSlots() {
-        const token = ++requestToken;
-
-        if (!dateInput.value || !partyInput.value) return;
-
-        slotsBox.innerHTML = '';
-        messageBox.textContent = t.loading;
-
-        const params = new URLSearchParams({ date: dateInput.value, party_size: partyInput.value });
-
-        let payload;
-        try {
-            const res = await fetch(slotsUrl + (slotsUrl.includes('?') ? '&' : '?') + params.toString(),
-                { headers: { 'Accept': 'application/json' } });
-
-            // Loi mang hoac loi may chu phai bao rieng, khong duoc lan sang
-            // thong bao "het ban" - hai chuyen hoan toan khac nhau.
-            if (!res.ok) throw new Error('HTTP ' + res.status);
-
-            payload = await res.json();
-        } catch (e) {
-            messageBox.textContent = t.failed;
-            return;
-        }
-
-        // Bo qua ket qua cua request cu neu khach da doi lua chon.
-        if (token !== requestToken) return;
-
+    function renderSlots(payload) {
         const previous = startTime.value;
-        startTime.value = '';
-        slotsBox.innerHTML = '';
+        const slots = payload.slots || [];
+        const fragment = document.createDocumentFragment();
 
-        (payload.slots || []).forEach(slot => {
+        startTime.value = '';
+
+        slots.forEach(slot => {
             const button = document.createElement('button');
             button.type = 'button';
             button.className = 'slot';
             button.textContent = slot.time;
+            button.dataset.time = slot.time;
             button.disabled = !slot.available;
             if (slot.reason) button.title = slot.reason;
 
-            if (slot.available) {
-                button.addEventListener('click', () => {
-                    startTime.value = slot.time;
-                    markSelected(slotsBox, '.slot', button);
-                    syncHeadings();
-                    guestStep.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                });
-
-                if (slot.time === previous) {
-                    startTime.value = slot.time;
-                    button.classList.add('is-selected');
-                }
+            if (slot.available && slot.time === previous) {
+                startTime.value = slot.time;
+                button.classList.add('is-selected');
             }
 
-            slotsBox.appendChild(button);
+            fragment.appendChild(button);
         });
+
+        // Thay ca khoi mot lan: trinh duyet chi tinh lai bo cuc dung mot lan.
+        slotsBox.replaceChildren(fragment);
 
         if (payload.message) {
             messageBox.textContent = payload.message;
-        } else if (!(payload.slots || []).length) {
+        } else if (!slots.length) {
             messageBox.textContent = t.noService;
         } else {
             messageBox.textContent = t.legend;
@@ -368,6 +361,64 @@
 
         syncHeadings();
     }
+
+    async function loadSlots() {
+        if (!dateInput.value || !partyInput.value) return;
+
+        const key = dateInput.value + '|' + partyInput.value;
+        const hit = cache.get(key);
+
+        if (hit && Date.now() - hit.at < CACHE_MS) {
+            requestToken++;
+            renderSlots(hit.payload);
+            return;
+        }
+
+        const token = ++requestToken;
+
+        // Huy han request cu: khach bam nhanh qua vai ngay thi khong viec gi
+        // phai cho tai xong nhung ket qua se bi bo di.
+        if (inFlight) inFlight.abort();
+        inFlight = new AbortController();
+
+        messageBox.textContent = t.loading;
+
+        const params = new URLSearchParams({ date: dateInput.value, party_size: partyInput.value });
+
+        let payload;
+        try {
+            const res = await fetch(slotsUrl + (slotsUrl.includes('?') ? '&' : '?') + params.toString(),
+                { headers: { 'Accept': 'application/json' }, signal: inFlight.signal });
+
+            // Loi mang hoac loi may chu phai bao rieng, khong duoc lan sang
+            // thong bao "het ban" - hai chuyen hoan toan khac nhau.
+            if (!res.ok) throw new Error('HTTP ' + res.status);
+
+            payload = await res.json();
+        } catch (e) {
+            // Request bi chinh minh huy thi im lang, da co lan moi thay the.
+            if (e.name !== 'AbortError' && token === requestToken) {
+                messageBox.textContent = t.failed;
+            }
+            return;
+        }
+
+        // Bo qua ket qua cua request cu neu khach da doi lua chon.
+        if (token !== requestToken) return;
+
+        cache.set(key, { at: Date.now(), payload: payload });
+        renderSlots(payload);
+    }
+
+    slotsBox.addEventListener('click', event => {
+        const button = event.target.closest('.slot');
+        if (!button || button.disabled) return;
+
+        startTime.value = button.dataset.time;
+        markSelected(slotsBox, '.slot', button);
+        syncHeadings();
+        guestStep.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
 
     daystrip.addEventListener('click', event => {
         const day = event.target.closest('.day');
@@ -413,10 +464,24 @@
     dateInput.addEventListener('change', () => { syncDayStrip(); syncHeadings(); loadSlots(); });
     partyInput.addEventListener('change', () => { syncPartyChips(); syncHeadings(); loadSlots(); });
 
+    // Ket qua dau tien da duoc in san vao HTML; ghi vao bo nho tam de khach
+    // quay lai lua chon nay cung khong phai goi may chu.
+    cache.set(dateInput.value + '|' + partyInput.value, { at: Date.now(), payload: initialSlots });
+
+    // Khach vua bi tra ve vi thieu thong tin thi gio da chon van con trong form.
+    const preselected = startTime.value
+        ? slotsBox.querySelector('.slot[data-time="' + startTime.value + '"]:not([disabled])')
+        : null;
+
+    if (preselected) {
+        markSelected(slotsBox, '.slot', preselected);
+    } else {
+        startTime.value = '';
+    }
+
     syncDayStrip();
     syncPartyChips();
     syncHeadings();
-    loadSlots();
 })();
 </script>
 @endpush

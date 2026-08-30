@@ -44,12 +44,41 @@ class PublicBookingController extends Controller
 
         $branch = $this->selectedBranch($request, $branches);
 
+        // Khung gio cua lua chon mac dinh duoc dung san vao trang. Neu de trang
+        // tu goi API sau khi tai xong thi khach phai cho them mot vong may chu
+        // moi thay duoc gio - tren mang di dong la ca giay dong ho.
+        [$date, $partySize] = $this->defaultChoice($branch);
+
         return view('public.booking', [
             'brand' => $brand,
             'branches' => $branches,
             'branch' => $branch,
             'range' => $this->availability->bookableDateRange($branch),
+            'initialDate' => $date,
+            'initialParty' => $partySize,
+            'initialSlots' => $this->slotPayload($brand, $branch, $date, $partySize),
         ]);
+    }
+
+    /**
+     * Ngay va so khach hien san trong form: giu lai lua chon cu neu khach vua
+     * bi tra ve vi loi, khong thi lay hom nay va hai nguoi.
+     *
+     * @return array{0: string, 1: int}
+     */
+    protected function defaultChoice(Branch $branch): array
+    {
+        $date = (string) old('booking_date', Carbon::today()->toDateString());
+        $range = $this->availability->bookableDateRange($branch);
+
+        if (! preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) || $date < $range['min'] || $date > $range['max']) {
+            $date = $range['min'];
+        }
+
+        $partySize = (int) old('party_size', 2);
+        $partySize = max(1, min($partySize ?: 2, (int) $branch->max_party_size));
+
+        return [$date, $partySize];
     }
 
     /** Dia diem dang chon, lay tu ?dia-diem=slug hoac dia diem dau tien. */
@@ -70,36 +99,49 @@ class PublicBookingController extends Controller
             'party_size' => ['required', 'integer', 'min:1', 'max:200'],
         ]);
 
-        if (Carbon::parse($data['date'])->gt(Carbon::today()->addDays((int) $branch->max_advance_days))) {
-            return response()->json([
+        return response()->json(
+            $this->slotPayload($this->brand($request), $branch, $data['date'], (int) $data['party_size'])
+        );
+    }
+
+    /**
+     * Danh sach khung gio kem loi nhan, dung chung cho trang dat ban va API.
+     *
+     * @return array{slots: array<int, array<string, mixed>>, message: ?string}
+     */
+    protected function slotPayload(Brand $brand, Branch $branch, string $date, int $partySize): array
+    {
+        if (Carbon::parse($date)->gt(Carbon::today()->addDays((int) $branch->max_advance_days))) {
+            return [
                 'slots' => [],
                 'message' => __('booking.errors.too_far_days', ['days' => $branch->max_advance_days]),
-            ]);
+            ];
         }
 
-        if ($data['party_size'] > $branch->max_party_size) {
-            return response()->json([
+        if ($partySize > $branch->max_party_size) {
+            return [
                 'slots' => [],
                 'message' => __('booking.errors.party_call', [
                     'phone' => $branch->phone ?: __('booking.form.the_venue'),
                 ]),
-            ]);
+            ];
         }
 
-        $slots = $this->availability->daySlots(
-            $branch,
-            $data['date'],
-            (int) $data['party_size'],
-            null,
-            onlineOnly: true
-        );
+        $slots = $this->availability->daySlots($branch, $date, $partySize, null, onlineOnly: true);
 
-        $hasFree = collect($slots)->contains('available', true);
+        $hasFree = false;
 
-        return response()->json([
+        foreach ($slots as $slot) {
+            if ($slot['available']) {
+                $hasFree = true;
+                break;
+            }
+        }
+
+        return [
             'slots' => $slots,
-            'message' => $hasFree ? null : $this->brand($request)->text('no_slots'),
-        ]);
+            'message' => $hasFree ? null : $brand->text('no_slots'),
+        ];
     }
 
     public function store(Request $request, Branch $branch)

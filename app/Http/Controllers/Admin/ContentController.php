@@ -104,8 +104,8 @@ class ContentController extends AdminController
 
         $brand->update(['cover_path' => 'brand/'.$name]);
 
-        if ($old && is_file(public_path($old))) {
-            @unlink(public_path($old));
+        if ($old !== $brand->cover_path) {
+            $this->forgetCoverFiles($old);
         }
     }
 
@@ -140,18 +140,66 @@ class ContentController extends AdminController
         $name = $baseName.'.jpg';
         // Nen o muc 82: mat mat khong nhin ra tren anh chup toi, nhung nhe hon nhieu.
         $saved = imagejpeg($image, $directory.DIRECTORY_SEPARATOR.$name, 82);
+
+        if ($saved) {
+            $this->narrowCopies($image, $directory, $baseName);
+        }
+
         imagedestroy($image);
 
         return $saved ? $name : null;
     }
 
+    /**
+     * Ban thu nho cua anh bia, cho dien thoai tai thay ban rong.
+     *
+     * Anh bia chi cao khoang 200-300px tren man hinh nen ban 800px la du net
+     * ngay ca voi man hinh net gap doi; ban 1600px nang gap ba lan ma khong
+     * nhin ra khac biet.
+     *
+     * @param  \GdImage  $image
+     */
+    protected function narrowCopies($image, string $directory, string $baseName): void
+    {
+        foreach (Brand::COVER_WIDTHS as $width) {
+            if (imagesx($image) <= $width) {
+                continue;
+            }
+
+            $small = imagescale($image, $width);
+
+            if ($small) {
+                imagejpeg($small, $directory.DIRECTORY_SEPARATOR.$baseName.'-w'.$width.'.jpg', 80);
+                imagedestroy($small);
+            }
+        }
+    }
+
     protected function deleteCover(Brand $brand): void
     {
-        if ($brand->cover_path && is_file(public_path($brand->cover_path))) {
-            @unlink(public_path($brand->cover_path));
-        }
+        $this->forgetCoverFiles($brand->cover_path);
 
         $brand->update(['cover_path' => null]);
+    }
+
+    /** Xoa anh bia va moi ban thu nho di kem. */
+    protected function forgetCoverFiles(?string $path): void
+    {
+        if (! $path) {
+            return;
+        }
+
+        $paths = [$path];
+
+        foreach (Brand::COVER_WIDTHS as $width) {
+            $paths[] = preg_replace('/(\.[^.]+)$/', '-w'.$width.'$1', $path);
+        }
+
+        foreach ($paths as $one) {
+            if ($one && is_file(public_path($one))) {
+                @unlink(public_path($one));
+            }
+        }
     }
 
     /** @return \Illuminate\Database\Eloquent\Collection<int, Brand> */

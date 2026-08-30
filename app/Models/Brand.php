@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\Assets;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
@@ -14,6 +15,9 @@ class Brand extends Model
 {
     /** Mau nen mac dinh khi quan chua khai bao rieng. */
     public const DEFAULT_GROUND = '#0e0d0c';
+
+    /** Cac ban thu nho cua anh bia, tinh bang pixel. */
+    public const COVER_WIDTHS = [800];
 
     /** Bo font dung khi quan chua tai font rieng len. */
     public const FALLBACK_STACK = '"Segoe UI", -apple-system, BlinkMacSystemFont, Roboto, Arial, sans-serif';
@@ -183,6 +187,23 @@ class Brand extends Model
         ];
     }
 
+    /**
+     * Kich thuoc that cua mot anh trong thu muc public, dang [rong, cao].
+     * Khai bao san trong the img de trang khong bi giat khi anh tai xong.
+     *
+     * @return array{0: int, 1: int}|null
+     */
+    public function imageSize(?string $path): ?array
+    {
+        if (! $path || ! is_file(public_path($path))) {
+            return null;
+        }
+
+        $size = @getimagesize(public_path($path));
+
+        return $size ? [(int) $size[0], (int) $size[1]] : null;
+    }
+
     public function hasLogo(): bool
     {
         return $this->logo_path && is_file(public_path($this->logo_path));
@@ -196,27 +217,94 @@ class Brand extends Model
     {
         $css = '';
 
+        foreach ($this->webFonts() as $role => $font) {
+            $css .= sprintf(
+                '@font-face{font-family:"brand-%s";src:url("%s") format("%s");font-weight:100 900;font-display:swap;}',
+                $role,
+                $font['url'],
+                $font['format']
+            );
+        }
+
+        return $css;
+    }
+
+    /**
+     * Cac font that su tai ve cho trinh duyet, dang
+     * ['display' => ['url' =>, 'format' =>, 'mime' =>], ...].
+     *
+     * Ban .woff2 cung ten duoc uu tien: nhe hon file goc chung mot nua, ma van
+     * giu nguyen file goc trong co so du lieu cho phan ve anh xac nhan (GD chi
+     * doc duoc ttf/otf).
+     *
+     * @return array<string, array{url: string, format: string, mime: string}>
+     */
+    public function webFonts(): array
+    {
+        $fonts = [];
+
         foreach (['display' => $this->display_font_path, 'body' => $this->body_font_path] as $role => $path) {
             if (! $path || ! is_file(public_path($path))) {
                 continue;
             }
 
-            $format = match (strtolower(pathinfo($path, PATHINFO_EXTENSION))) {
-                'otf' => 'opentype',
-                'woff' => 'woff',
-                'woff2' => 'woff2',
-                default => 'truetype',
+            $compact = preg_replace('/\.[^.]+$/', '.woff2', $path);
+
+            if ($compact && is_file(public_path($compact))) {
+                $path = $compact;
+            }
+
+            [$format, $mime] = match (strtolower(pathinfo($path, PATHINFO_EXTENSION))) {
+                'otf' => ['opentype', 'font/otf'],
+                'woff' => ['woff', 'font/woff'],
+                'woff2' => ['woff2', 'font/woff2'],
+                default => ['truetype', 'font/ttf'],
             };
 
-            $css .= sprintf(
-                '@font-face{font-family:"brand-%s";src:url("/%s") format("%s");font-weight:100 900;font-display:swap;}',
-                $role,
-                ltrim($path, '/'),
-                $format
-            );
+            $fonts[$role] = [
+                'url' => Assets::url($path),
+                'format' => $format,
+                'mime' => $mime,
+            ];
         }
 
-        return $css;
+        return $fonts;
+    }
+
+    /**
+     * Anh bia kem cac ban thu nho, de dien thoai khong phai tai ban 1600px.
+     *
+     * @return array{src: string, srcset: ?string, width: ?int, height: ?int}|null
+     */
+    public function coverSources(): ?array
+    {
+        if (! $this->hasCover()) {
+            return null;
+        }
+
+        $file = public_path($this->cover_path);
+        $size = @getimagesize($file);
+
+        $set = [];
+
+        foreach (self::COVER_WIDTHS as $width) {
+            $narrow = preg_replace('/(\.[^.]+)$/', '-w'.$width.'$1', $this->cover_path);
+
+            if ($narrow && is_file(public_path($narrow))) {
+                $set[] = Assets::url($narrow).' '.$width.'w';
+            }
+        }
+
+        if ($set && $size) {
+            $set[] = Assets::url($this->cover_path).' '.$size[0].'w';
+        }
+
+        return [
+            'src' => Assets::url($this->cover_path),
+            'srcset' => $set ? implode(', ', $set) : null,
+            'width' => $size ? (int) $size[0] : null,
+            'height' => $size ? (int) $size[1] : null,
+        ];
     }
 
     /** Bo font cho noi dung chay. */

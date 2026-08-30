@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\EnsureAdminSite;
+use App\Http\Middleware\EnsurePasswordChanged;
 use App\Http\Middleware\EnsureRole;
 use App\Http\Middleware\ResolveBrandSite;
 use App\Http\Middleware\SetGuestLocale;
@@ -22,6 +23,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'brand.site' => ResolveBrandSite::class,
             'guest.locale' => SetGuestLocale::class,
             'admin.site' => EnsureAdminSite::class,
+            'password.change' => EnsurePasswordChanged::class,
         ]);
 
         // Kiem tra ten mien phai chay TRUOC khi kiem tra dang nhap. Neu khong,

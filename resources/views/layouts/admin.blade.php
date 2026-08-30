@@ -55,6 +55,8 @@
                 <b>{{ $user->name }}</b>
                 <span>{{ $user->roleLabel() }}@if ($user->branch) · {{ $user->branch->name }} @endif</span>
             </div>
+            <a class="nav-link {{ request()->routeIs('admin.password.*') ? 'active' : '' }}"
+               href="{{ route('admin.password.edit') }}">Đổi mật khẩu</a>
             <form method="post" action="{{ route('admin.logout') }}">
                 @csrf
                 <button class="btn btn-ghost btn-sm" type="submit">Đăng xuất</button>

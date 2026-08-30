@@ -7,6 +7,8 @@
         <div>
             <h1>Tài khoản</h1>
             <p>Quản trị thấy toàn chuỗi. Quản lý và chỉ xem chỉ thấy quán được gắn.</p>
+            <p class="muted small">Tài khoản mới có mật khẩu khởi tạo chính là email, và bắt buộc
+                đổi mật khẩu ngay sau lần đăng nhập đầu tiên.</p>
         </div>
     </div>
 
@@ -21,10 +23,6 @@
             <div class="field">
                 <label for="email">Email đăng nhập</label>
                 <input type="email" id="email" name="email" value="{{ old('email') }}" required>
-            </div>
-            <div class="field">
-                <label for="password">Mật khẩu</label>
-                <input type="password" id="password" name="password" minlength="8" required>
             </div>
             <div class="field">
                 <label for="role">Vai trò</label>
@@ -48,6 +46,9 @@
                 <input type="tel" id="phone" name="phone" value="{{ old('phone') }}">
             </div>
             <div class="field full">
+                <p class="hint" style="margin:0 0 10px">
+                    Mật khẩu khởi tạo là chính email vừa nhập. Người dùng phải đổi ngay khi đăng nhập lần đầu.
+                </p>
                 <button class="btn" type="submit">Tạo tài khoản</button>
             </div>
         </form>
@@ -66,6 +67,9 @@
                         <td>
                             <b>{{ $item->name }}</b><br>
                             <span class="muted small">{{ $item->email }}</span>
+                            @if ($item->must_change_password)
+                                <br><span class="pill status-pending">Chưa đổi mật khẩu khởi tạo</span>
+                            @endif
                             <details class="inline-edit">
                                 <summary>Sửa</summary>
                                 <div>
@@ -82,6 +86,7 @@
                                         <div class="field">
                                             <label>Mật khẩu mới <span class="muted">(bỏ trống nếu giữ nguyên)</span></label>
                                             <input type="password" name="password" minlength="8">
+                                            <span class="hint">Đặt hộ mật khẩu thì người dùng vẫn phải đổi lại khi đăng nhập.</span>
                                         </div>
                                         <div class="field">
                                             <label>Vai trò</label>
@@ -126,6 +131,13 @@
                             </span>
                         </td>
                         <td class="num">
+                            @if ($item->id !== auth()->id())
+                                <form method="post" action="{{ route('admin.users.reset', $item) }}"
+                                      onsubmit="return confirm('Đặt lại mật khẩu của {{ $item->email }} về chính email?')">
+                                    @csrf
+                                    <button class="btn btn-ghost btn-sm" type="submit">Đặt lại mật khẩu</button>
+                                </form>
+                            @endif
                             @if ($item->id !== auth()->id() && $item->is_active)
                                 <form method="post" action="{{ route('admin.users.destroy', $item) }}"
                                       onsubmit="return confirm('Khóa tài khoản {{ $item->email }}?')">

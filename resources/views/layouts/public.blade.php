@@ -5,10 +5,17 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>@yield('title', __('booking.hero.title')) · {{ $brand?->name ?? 'The Gats' }}</title>
-    <link rel="stylesheet" href="{{ asset('css/site.css') }}">
+    <link rel="stylesheet" href="{{ \App\Support\Assets::url('css/site.css') }}">
     @if ($brand)
         {{-- Nhan dien rieng cua tung quan, ghi de bien CSS chung. --}}
         @php($shades = $brand->groundShades())
+        @php($fonts = $brand->webFonts())
+
+        {{-- Bao truoc cho trinh duyet tai font ngay, khong doi doc xong CSS. --}}
+        @foreach ($fonts as $font)
+            <link rel="preload" href="{{ $font['url'] }}" as="font" type="{{ $font['mime'] }}" crossorigin>
+        @endforeach
+
         <style>
             {!! $brand->fontFaceCss() !!}
             :root {
@@ -32,7 +39,10 @@
     <header class="site-head">
         <a href="{{ route('home') }}" class="brand">
             @if ($brand?->hasLogo())
-                <img class="brand-logo" src="{{ asset($brand->logo_path) }}" alt="{{ $brand->name }}">
+                @php($logo = $brand->imageSize($brand->logo_path))
+                <img class="brand-logo" src="{{ \App\Support\Assets::url($brand->logo_path) }}"
+                     alt="{{ $brand->name }}" decoding="async"
+                     @if ($logo) width="{{ $logo[0] }}" height="{{ $logo[1] }}" @endif>
             @else
                 <span class="brand-mark">{{ $brand?->mark ?? 'TG' }}</span>
                 <span class="brand-name">{{ $brand?->name ?? 'The Gats' }}</span>

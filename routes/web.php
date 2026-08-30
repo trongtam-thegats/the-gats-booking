@@ -9,6 +9,7 @@ use App\Http\Controllers\Admin\DashboardController;
 use App\Http\Controllers\Admin\DiningTableController;
 use App\Http\Controllers\Admin\FloorController;
 use App\Http\Controllers\Admin\GuestController;
+use App\Http\Controllers\Admin\PasswordController;
 use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\UserController;
@@ -30,8 +31,13 @@ Route::prefix('quan-ly')->name('admin.')->middleware('admin.site')->group(functi
     Route::get('dang-nhap', [AuthController::class, 'showLogin'])->name('login');
     Route::post('dang-nhap', [AuthController::class, 'login'])->name('login.submit');
 
-    Route::middleware(['auth', 'role'])->group(function () {
+    Route::middleware(['auth', 'role', 'password.change'])->group(function () {
         Route::post('dang-xuat', [AuthController::class, 'logout'])->name('logout');
+
+        // Doi mat khau cua chinh minh. Tai khoan con dung mat khau khoi tao thi
+        // moi duong dan khac deu bi day ve day (xem EnsurePasswordChanged).
+        Route::get('doi-mat-khau', [PasswordController::class, 'edit'])->name('password.edit');
+        Route::post('doi-mat-khau', [PasswordController::class, 'update'])->name('password.update');
 
         // Xem - moi vai tro deu vao duoc
         Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
@@ -90,6 +96,7 @@ Route::prefix('quan-ly')->name('admin.')->middleware('admin.site')->group(functi
             Route::get('tai-khoan', [UserController::class, 'index'])->name('users.index');
             Route::post('tai-khoan', [UserController::class, 'store'])->name('users.store');
             Route::put('tai-khoan/{user}', [UserController::class, 'update'])->name('users.update');
+            Route::post('tai-khoan/{user}/dat-lai-mat-khau', [UserController::class, 'resetPassword'])->name('users.reset');
             Route::delete('tai-khoan/{user}', [UserController::class, 'destroy'])->name('users.destroy');
         });
     });

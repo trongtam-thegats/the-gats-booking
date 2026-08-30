@@ -27,7 +27,6 @@ class UserController extends AdminController
         $data = $request->validate([
             'name' => ['required', 'string', 'max:120'],
             'email' => ['required', 'email', 'max:180', 'unique:users,email'],
-            'password' => ['required', 'string', 'min:8'],
             'role' => ['required', Rule::in(Roles::ALL)],
             'brand_id' => ['nullable', 'integer', 'exists:brands,id'],
             'phone' => ['nullable', 'string', 'max:30'],
@@ -39,9 +38,37 @@ class UserController extends AdminController
             ]);
         }
 
-        User::create($data + ['is_active' => true]);
+        // Mat khau khoi tao chinh la email: nguoi phu trach nho duoc ngay, va
+        // he thong bat ho doi ngay o lan dang nhap dau (EnsurePasswordChanged).
+        User::create($data + [
+            'password' => $data['email'],
+            'is_active' => true,
+            'must_change_password' => true,
+        ]);
 
-        return back()->with('status', 'Đã tạo tài khoản '.$data['email'].'.');
+        return back()->with(
+            'status',
+            'Đã tạo tài khoản '.$data['email'].'. Mật khẩu khởi tạo chính là email, '
+            .'người dùng bắt buộc đổi ngay sau lần đăng nhập đầu tiên.'
+        );
+    }
+
+    /** Dat lai mat khau ve email va bat doi lai o lan dang nhap sau. */
+    public function resetPassword(Request $request, User $user)
+    {
+        abort_unless($request->user()->isAdmin(), 403);
+
+        $user->update([
+            'password' => $user->email,
+            'must_change_password' => true,
+            'password_changed_at' => null,
+        ]);
+
+        return back()->with(
+            'status',
+            'Đã đặt lại mật khẩu của '.$user->email.' về chính email. '
+            .'Người dùng sẽ phải đổi mật khẩu ngay khi đăng nhập.'
+        );
     }
 
     public function update(Request $request, User $user)
@@ -65,6 +92,11 @@ class UserController extends AdminController
 
         if (blank($data['password'])) {
             unset($data['password']);
+        } else {
+            // Quan tri dat ho mat khau thi quan tri cung biet mat khau do,
+            // nen van bat chu tai khoan doi lai.
+            $data['must_change_password'] = true;
+            $data['password_changed_at'] = null;
         }
 
         // Khong tu khoa chinh minh ra khoi he thong.
