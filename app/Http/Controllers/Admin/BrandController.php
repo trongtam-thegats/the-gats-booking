@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Models\Branch;
 use App\Models\Brand;
 use App\Models\GuestNote;
+use App\Support\NguonDatBan;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
@@ -22,7 +23,13 @@ class BrandController extends AdminController
 
         $orphanBranches = Branch::whereNull('brand_id')->orderBy('name')->get();
 
-        return view('admin.brands.index', compact('brands', 'orphanBranches'));
+        return view('admin.brands.index', [
+            'brands' => $brands,
+            'orphanBranches' => $orphanBranches,
+            // Duong dan rieng cho tung kenh, de quan dan ra ngoai.
+            'kenhCoDuongDan' => NguonDatBan::kenhCoDuongDan(),
+            'nhanNguon' => NguonDatBan::NHAN,
+        ]);
     }
 
     public function store(Request $request)

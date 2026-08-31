@@ -7,6 +7,8 @@ use App\Models\Booking;
 use App\Models\Branch;
 use App\Services\AvailabilityService;
 use App\Services\BookingService;
+use App\Services\GuestProfileService;
+use App\Support\NguonDatBan;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
@@ -84,7 +86,7 @@ class BookingController extends AdminController
             'freeTables' => $freeTables,
             'slotTimes' => $this->availability->slotTimes($booking->branch),
             'areas' => $booking->branch->areas,
-            'guest' => app(\App\Services\GuestProfileService::class)->forPhone(
+            'guest' => app(GuestProfileService::class)->forPhone(
                 $booking->customer_phone,
                 $request->user()->visibleBranchIds(),
                 $booking->branch->brand_id
@@ -105,6 +107,10 @@ class BookingController extends AdminController
             'branch' => $branch,
             'areas' => $branch->areas,
             'slotTimes' => $this->availability->slotTimes($branch),
+            // [ma => nhan] cho o chon nguon, khoi phai goi ten lop trong Blade.
+            'nguonChon' => collect(NguonDatBan::NHAN_VIEN_CHON)
+                ->mapWithKeys(fn (string $ma) => [$ma => NguonDatBan::nhan($ma)])
+                ->all(),
         ]);
     }
 
@@ -120,7 +126,7 @@ class BookingController extends AdminController
             'start_time' => ['required', 'date_format:H:i'],
             'area_id' => ['nullable', 'integer'],
             'note' => ['nullable', 'string', 'max:500'],
-            'source' => ['required', Rule::in(['phone', 'walk_in', 'online'])],
+            'source' => ['required', Rule::in(NguonDatBan::NHAN_VIEN_CHON)],
         ]);
 
         $this->authorizeBranch($request, (int) $data['branch_id']);

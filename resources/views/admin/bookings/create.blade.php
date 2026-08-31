@@ -57,9 +57,9 @@
             <div class="field">
                 <label for="source">Nguồn</label>
                 <select id="source" name="source">
-                    <option value="phone" @selected(old('source', 'phone') === 'phone')>Điện thoại</option>
-                    <option value="walk_in" @selected(old('source') === 'walk_in')>Khách vãng lai</option>
-                    <option value="online" @selected(old('source') === 'online')>Online</option>
+                    @foreach ($nguonChon as $ma => $nhan)
+                        <option value="{{ $ma }}" @selected(old('source', 'phone') === $ma)>{{ $nhan }}</option>
+                    @endforeach
                 </select>
             </div>
 

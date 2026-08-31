@@ -3,6 +3,7 @@
 use App\Http\Middleware\EnsureAdminSite;
 use App\Http\Middleware\EnsurePasswordChanged;
 use App\Http\Middleware\EnsureRole;
+use App\Http\Middleware\GhiNhoNguonKhach;
 use App\Http\Middleware\ResolveBrandSite;
 use App\Http\Middleware\SetGuestLocale;
 use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
@@ -22,6 +23,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => EnsureRole::class,
             'brand.site' => ResolveBrandSite::class,
             'guest.locale' => SetGuestLocale::class,
+            'guest.nguon' => GhiNhoNguonKhach::class,
             'admin.site' => EnsureAdminSite::class,
             'password.change' => EnsurePasswordChanged::class,
         ]);

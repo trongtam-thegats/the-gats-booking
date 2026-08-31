@@ -8,9 +8,11 @@ use App\Models\Brand;
 use App\Models\DiningTable;
 use App\Models\User;
 use App\Services\AvailabilityService;
+use App\Support\NguonDatBan;
 use App\Support\SoDienThoai;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 /**
@@ -43,15 +45,6 @@ class NhapDatBanNightify extends Command
         'booked' => Booking::STATUS_CONFIRMED,
         'confirmed' => Booking::STATUS_CONFIRMED,
         'seated' => Booking::STATUS_SEATED,
-    ];
-
-    /**
-     * Nguon don cua Nightify doi sang ba nguon cua he thong.
-     * Nguon goc van duoc ghi lai nguyen van trong ghi chu noi bo.
-     */
-    protected const NGUON = [
-        'walk_in' => 'walk_in',
-        'venue_initiated_booking' => 'phone',
     ];
 
     public function handle(AvailabilityService $availability): int
@@ -225,7 +218,7 @@ class NhapDatBanNightify extends Command
      *
      * @param  array<string, string>  $r
      * @param  array<int, DiningTable>  $ban
-     * @param  \Illuminate\Support\Collection<string, int>  $nguoiDung
+     * @param  Collection<string, int>  $nguoiDung
      * @return array<string, mixed>|null
      */
     protected function duLieuDon(array $r, Branch $branch, array $ban, $nguoiDung, AvailabilityService $availability): ?array
@@ -266,7 +259,7 @@ class NhapDatBanNightify extends Command
             'end_time' => $availability->toTimeString($ketThuc).':00',
             'area_id' => $ban ? ($ban[0]->area_id ?? null) : null,
             'status' => $trangThai,
-            'source' => self::NGUON[$nguonGoc] ?? 'online',
+            'source' => NguonDatBan::chuan($nguonGoc) ?? NguonDatBan::MAC_DINH,
             'locale' => 'vi',
             'internal_note' => trim(self::DAU.' nguồn: '.($nguonGoc ?: 'không rõ')
                 .($nguoiTao !== '' ? ' · người tạo: '.$nguoiTao : '')

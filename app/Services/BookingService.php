@@ -9,6 +9,7 @@ use App\Models\DiningTable;
 use App\Models\GuestNote;
 use App\Models\User;
 use App\Services\Notifications\BookingNotifier;
+use App\Support\NguonDatBan;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -78,7 +79,7 @@ class BookingService
                 'end_time' => $this->availability->toTimeString($endMin),
                 'area_id' => $data['area_id'] ?? null,
                 'status' => $branch->auto_confirm ? Booking::STATUS_CONFIRMED : Booking::STATUS_PENDING,
-                'source' => $data['source'] ?? 'online',
+                'source' => $data['source'] ?? NguonDatBan::MAC_DINH,
                 // Nho ngon ngu khach dung luc dat de tin xac nhan gui dung thu tieng.
                 'locale' => $data['locale'] ?? app()->getLocale(),
                 'note' => $data['note'] ?? null,
@@ -356,7 +357,7 @@ class BookingService
             $endMin += 1440;
         }
 
-        DB::transaction(function () use ($booking, $branch, $tableIds, $startMin, $endMin, $openMin) {
+        DB::transaction(function () use ($booking, $branch, $tableIds, $startMin, $endMin) {
             $busy = $this->availability->busyTableIds(
                 $branch,
                 $booking->booking_date->toDateString(),

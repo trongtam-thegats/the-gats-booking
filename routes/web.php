@@ -125,7 +125,7 @@ Route::prefix('quan-ly')->name('admin.')->middleware('admin.site')->group(functi
 |
 */
 
-Route::middleware(['brand.site', 'guest.locale'])->group(function () {
+Route::middleware(['brand.site', 'guest.locale', 'guest.nguon'])->group(function () {
     Route::get('/', [PublicBookingController::class, 'index'])->name('home');
     Route::get('/tra-cuu', [PublicBookingController::class, 'lookup'])->name('booking.lookup');
     Route::get('/ma/{booking}', [PublicBookingController::class, 'show'])->name('booking.show');

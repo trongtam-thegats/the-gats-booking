@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Support\NguonDatBan;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -115,12 +116,7 @@ class Booking extends Model
 
     public function sourceLabel(): string
     {
-        return match ($this->source) {
-            'online' => 'Đặt online',
-            'phone' => 'Điện thoại',
-            'walk_in' => 'Khách vãng lai',
-            default => $this->source,
-        };
+        return NguonDatBan::nhan($this->source);
     }
 
     public function isActive(): bool

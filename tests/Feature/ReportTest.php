@@ -67,7 +67,7 @@ class ReportTest extends TestCase
             'start_time' => '19:00',
             'end_time' => '21:00',
             'status' => $status,
-            'source' => 'online',
+            'source' => 'website',
         ], $overrides));
     }
 
@@ -307,7 +307,7 @@ class ReportTest extends TestCase
             'customer_name' => 'Khách quán B', 'customer_phone' => '0999999999',
             'party_size' => 2, 'booking_date' => Carbon::today()->toDateString(),
             'start_time' => '19:00', 'end_time' => '21:00',
-            'status' => Booking::STATUS_COMPLETED, 'source' => 'online',
+            'status' => Booking::STATUS_COMPLETED, 'source' => 'website',
         ]);
 
         $manager = User::create([

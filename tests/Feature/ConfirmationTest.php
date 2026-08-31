@@ -11,7 +11,9 @@ use App\Services\Notifications\BookingMessage;
 use App\Services\TicketImage;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Mail;
+use Symfony\Component\Mailer\SentMessage;
 use Tests\TestCase;
 
 /**
@@ -86,7 +88,7 @@ class ConfirmationTest extends TestCase
             'start_time' => '19:00',
             'end_time' => '21:00',
             'status' => Booking::STATUS_PENDING,
-            'source' => 'online',
+            'source' => 'website',
             'locale' => 'vi',
         ], $attributes));
     }
@@ -234,9 +236,9 @@ class ConfirmationTest extends TestCase
      * Mail::raw chu khong qua Mailable, nen assertSent() khong bat duoc. Doc
      * thang thu da soan ra moi kiem duoc nguoi nhan va noi dung.
      *
-     * @return \Illuminate\Support\Collection<int, \Symfony\Component\Mailer\SentMessage>
+     * @return Collection<int, SentMessage>
      */
-    protected function sentMail(): \Illuminate\Support\Collection
+    protected function sentMail(): Collection
     {
         return Mail::mailer('array')->getSymfonyTransport()->messages();
     }

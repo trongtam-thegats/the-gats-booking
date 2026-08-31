@@ -230,6 +230,25 @@
                         <td class="small">
                             @if ($item->domain)
                                 <a href="https://{{ $item->domain }}" target="_blank" rel="noopener">{{ $item->domain }}</a>
+
+                                {{-- Moi kenh mot duong dan rieng de biet khach den tu dau. --}}
+                                <details class="inline-edit">
+                                    <summary>Đường dẫn theo kênh</summary>
+                                    <div>
+                                        <p class="hint" style="margin:0 0 8px">
+                                            Dán đúng đường dẫn của kênh nào vào kênh đó. Khách đặt bàn qua
+                                            đường dẫn ấy sẽ được ghi nhận đúng nguồn trong báo cáo.
+                                            Đường dẫn không có đuôi thì tính là Website.
+                                        </p>
+                                        @foreach ($kenhCoDuongDan as $ma => $viet)
+                                            <label class="field" style="margin-bottom:8px">
+                                                <span>{{ $nhanNguon[$ma] }}</span>
+                                                <input type="text" readonly onfocus="this.select()"
+                                                       value="https://{{ $item->domain }}/?nguon={{ $viet }}">
+                                            </label>
+                                        @endforeach
+                                    </div>
+                                </details>
                             @else
                                 <span class="muted">Chưa trỏ tên miền</span>
                             @endif

@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Booking;
 use App\Models\Branch;
+use App\Support\NguonDatBan;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
@@ -285,7 +286,7 @@ class ReportService
     /** @return array<int, array<string, mixed>> */
     protected function bySource(Collection $rows): array
     {
-        $labels = ['online' => 'Đặt online', 'phone' => 'Điện thoại', 'walk_in' => 'Khách vãng lai'];
+        $labels = NguonDatBan::NHAN;
         $total = $rows->count();
         $out = [];
 

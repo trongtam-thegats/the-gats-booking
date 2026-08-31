@@ -8,6 +8,7 @@ use App\Models\Branch;
 use App\Models\Brand;
 use App\Services\AvailabilityService;
 use App\Services\BookingService;
+use App\Support\NguonDatBan;
 use App\Support\SoDienThoai;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -166,6 +167,9 @@ class PublicBookingController extends Controller
         ]);
 
         $data['customer_phone'] = SoDienThoai::chuan($data['customer_phone']);
+
+        // Kenh khach den, da duoc ghi nho tu luc vao trang (xem GhiNhoNguonKhach).
+        $data['source'] = $request->session()->get(NguonDatBan::KHOA_PHIEN, NguonDatBan::MAC_DINH);
 
         try {
             $booking = $this->bookings->create($branch, $data);
