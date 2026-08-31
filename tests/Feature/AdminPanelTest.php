@@ -210,17 +210,47 @@ class AdminPanelTest extends TestCase
         }
     }
 
-    public function test_quan_ly_xem_duoc_trang_van_hanh_nhung_khong_vao_duoc_cau_hinh_he_thong(): void
+    public function test_quan_ly_xu_ly_dat_ban_va_xem_phan_tich_nhung_khong_cham_cau_hinh(): void
     {
         $this->actingAs($this->manager);
 
+        // Xu ly dat ban va dat ho khach.
         $this->get(route('admin.dashboard'))->assertOk();
         $this->get(route('admin.bookings.index'))->assertOk();
-        $this->get(route('admin.tables.index', ['branch' => $this->branchA->id]))->assertOk();
+        $this->get(route('admin.bookings.create'))->assertOk();
 
+        // Xem phan tich.
+        $this->get(route('admin.reports.index'))->assertOk();
+        $this->get(route('admin.customers.index'))->assertOk();
+        $this->get(route('admin.invoices.index'))->assertOk();
+
+        // Cau hinh thi khong.
+        $this->get(route('admin.tables.index', ['branch' => $this->branchA->id]))->assertForbidden();
+        $this->get(route('admin.branches.index'))->assertForbidden();
+        $this->get(route('admin.content.index'))->assertForbidden();
         $this->get(route('admin.users.index'))->assertForbidden();
         $this->get(route('admin.brands.index'))->assertForbidden();
         $this->get(route('admin.settings.index'))->assertForbidden();
+    }
+
+    public function test_vai_chi_xem_chi_xem_duoc_lich_dat_ban(): void
+    {
+        $this->makeBooking($this->brandA, $this->branchA);
+
+        $this->actingAs($this->viewer);
+
+        // Xem lich dat ban thi duoc.
+        $this->get(route('admin.dashboard'))->assertOk();
+        $this->get(route('admin.bookings.index'))->assertOk();
+        $this->get(route('admin.floor', ['branch' => $this->branchA->id]))->assertOk();
+        $this->get(route('admin.guests.index'))->assertOk();
+
+        // Dat ho khach va phan tich thi khong.
+        $this->get(route('admin.bookings.create'))->assertForbidden();
+        $this->get(route('admin.reports.index'))->assertForbidden();
+        $this->get(route('admin.customers.index'))->assertForbidden();
+        $this->get(route('admin.invoices.index'))->assertForbidden();
+        $this->get(route('admin.tables.index', ['branch' => $this->branchA->id]))->assertForbidden();
     }
 
     // ---------- Vai chi xem ----------
@@ -382,7 +412,7 @@ class AdminPanelTest extends TestCase
 
     public function test_them_ban_hang_loat(): void
     {
-        $this->actingAs($this->manager)
+        $this->actingAs($this->admin)
             ->post(route('admin.tables.bulk', $this->branchA), [
                 'prefix' => 'B',
                 'from' => 1,
@@ -399,7 +429,7 @@ class AdminPanelTest extends TestCase
         $booking = $this->makeBooking($this->brandA, $this->branchA);
         $table = $booking->diningTables->first();
 
-        $this->actingAs($this->manager)
+        $this->actingAs($this->admin)
             ->delete(route('admin.tables.destroy', [$this->branchA, $table]));
 
         $this->assertDatabaseHas('dining_tables', ['id' => $table->id, 'is_active' => false]);

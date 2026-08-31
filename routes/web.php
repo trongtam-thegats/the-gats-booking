@@ -41,23 +41,25 @@ Route::prefix('quan-ly')->name('admin.')->middleware('admin.site')->group(functi
         Route::get('doi-mat-khau', [PasswordController::class, 'edit'])->name('password.edit');
         Route::post('doi-mat-khau', [PasswordController::class, 'update'])->name('password.update');
 
-        // Xem - moi vai tro deu vao duoc
+        // Xem lich dat ban - moi vai tro deu vao duoc, ke ca vai chi xem
         Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
         Route::get('so-do-ban', [FloorController::class, 'index'])->name('floor');
         Route::get('dat-ban', [AdminBookingController::class, 'index'])->name('bookings.index');
-        Route::get('dat-ban/tao-moi', [AdminBookingController::class, 'create'])->name('bookings.create');
-        Route::get('dat-ban/{booking}', [AdminBookingController::class, 'show'])->name('bookings.show');
+        Route::get('dat-ban/{booking}', [AdminBookingController::class, 'show'])
+            ->where('booking', '[A-Za-z0-9]+')->name('bookings.show');
         Route::get('khach', [GuestController::class, 'index'])->name('guests.index');
-        Route::get('bao-cao', [ReportController::class, 'index'])->name('reports.index');
 
-        // Du lieu ban hang nhap tu POS. Chi doc, moi vai deu xem duoc.
-        Route::get('hoa-don', [InvoiceController::class, 'index'])->name('invoices.index');
-        Route::get('khach-hang', [CustomerInsightController::class, 'index'])->name('customers.index');
-        Route::get('khach-hang/{phone}', [CustomerInsightController::class, 'show'])
-            ->where('phone', '[0-9+]+')->name('customers.show');
-
-        // Xu ly dat ban - quan tri va quan ly
+        // Xu ly dat ban va xem phan tich - quan tri va quan ly
         Route::middleware('role:admin,manager')->group(function () {
+            Route::get('dat-ban/tao-moi', [AdminBookingController::class, 'create'])->name('bookings.create');
+
+            // Bao cao va du lieu ban hang: vai chi xem khong dung toi.
+            Route::get('bao-cao', [ReportController::class, 'index'])->name('reports.index');
+            Route::get('hoa-don', [InvoiceController::class, 'index'])->name('invoices.index');
+            Route::get('khach-hang', [CustomerInsightController::class, 'index'])->name('customers.index');
+            Route::get('khach-hang/{phone}', [CustomerInsightController::class, 'show'])
+                ->where('phone', '[0-9+]+')->name('customers.show');
+
             Route::post('dat-ban', [AdminBookingController::class, 'store'])->name('bookings.store');
             Route::post('dat-ban/{booking}/xac-nhan', [AdminBookingController::class, 'confirm'])->name('bookings.confirm');
             Route::post('dat-ban/{booking}/huy', [AdminBookingController::class, 'cancel'])->name('bookings.cancel');
@@ -69,7 +71,11 @@ Route::prefix('quan-ly')->name('admin.')->middleware('admin.site')->group(functi
             Route::post('khach-hang/{phone}/danh-dau', [CustomerInsightController::class, 'review'])
                 ->where('phone', '[0-9+]+')->name('customers.review');
 
-            // Khai bao quan, khu vuc, ban
+        });
+
+        // Cau hinh - chi quan tri (user chot 2026-08-31)
+        Route::middleware('role:admin')->group(function () {
+            // Khai bao dia diem, gio mo, khu vuc, ban
             Route::get('chi-nhanh', [BranchController::class, 'index'])->name('branches.index');
             Route::get('chi-nhanh/tao-moi', [BranchController::class, 'create'])->name('branches.create');
             Route::post('chi-nhanh', [BranchController::class, 'store'])->name('branches.store');
@@ -90,10 +96,7 @@ Route::prefix('quan-ly')->name('admin.')->middleware('admin.site')->group(functi
             Route::post('ban/{branch}/hang-loat', [DiningTableController::class, 'bulkStore'])->name('tables.bulk');
             Route::put('ban/{branch}/{table}', [DiningTableController::class, 'update'])->name('tables.update');
             Route::delete('ban/{branch}/{table}', [DiningTableController::class, 'destroy'])->name('tables.destroy');
-        });
 
-        // Quan, tai khoan, cau hinh - chi quan tri
-        Route::middleware('role:admin')->group(function () {
             Route::get('quan', [BrandController::class, 'index'])->name('brands.index');
             Route::post('quan', [BrandController::class, 'store'])->name('brands.store');
             Route::put('quan/{brand}', [BrandController::class, 'update'])->name('brands.update');

@@ -3,16 +3,20 @@
 namespace App\Support;
 
 /**
- * Ba vai tro, co tinh de don gian.
+ * Ba vai tro, co tinh de don gian (user chot lai 2026-08-31).
  *
- * admin   - Ban Giam doc / IT: toan quyen, thay moi quan, sua duoc cau hinh he thong.
- * manager - Quan ly quan: xu ly dat ban, xep ban, khai bao ban va gio mo cua quan minh.
- * viewer  - Chi xem: nhin duoc lich dat ban, khong sua duoc gi.
+ * viewer  - Chi xem lich dat ban. Khong sua gi, va khong vao phan phan tich.
+ * manager - Xu ly dat ban, dat ban ho khach, va xem phan tich (bao cao, hoa
+ *           don, phan tich khach hang). Khong dung toi cau hinh.
+ * admin   - Nhu quan ly, cong toan bo cau hinh: dia diem, gio mo, khu vuc, ban,
+ *           noi dung trang khach, quan, tai khoan, cai dat gui tin.
  */
 class Roles
 {
     public const ADMIN = 'admin';
+
     public const MANAGER = 'manager';
+
     public const VIEWER = 'viewer';
 
     public const ALL = [self::ADMIN, self::MANAGER, self::VIEWER];
@@ -33,9 +37,9 @@ class Roles
     public static function description(string $role): string
     {
         return match ($role) {
-            self::ADMIN => 'Toàn quyền, thấy mọi quán, sửa được cấu hình hệ thống.',
-            self::MANAGER => 'Xử lý đặt bàn và khai báo bàn, giờ mở của quán mình.',
-            self::VIEWER => 'Chỉ xem lịch đặt bàn, không sửa được gì.',
+            self::ADMIN => 'Toàn quyền: xử lý đặt bàn, xem phân tích, và sửa mọi cấu hình.',
+            self::MANAGER => 'Xử lý đặt bàn, đặt bàn hộ khách, và xem phân tích. Không sửa cấu hình.',
+            self::VIEWER => 'Chỉ xem lịch đặt bàn, không sửa gì và không vào phần phân tích.',
             default => '',
         };
     }
@@ -45,10 +49,24 @@ class Roles
         return in_array($role, self::CAN_WRITE, true);
     }
 
-    /** Vai duoc phep khai bao ban, khu vuc, gio mo cua. */
+    /** Cac vai duoc xem bao cao, hoa don va phan tich khach hang. */
+    public const CAN_SEE_ANALYTICS = [self::ADMIN, self::MANAGER];
+
+    /**
+     * Vai duoc phep khai bao ban, khu vuc, gio mo cua.
+     *
+     * Tu 2026-08-31 chi con quan tri: quan ly lo viec dat ban va phan tich,
+     * khong dung toi cau hinh cua quan nua.
+     */
     public static function canManageSetup(string $role): bool
     {
-        return in_array($role, [self::ADMIN, self::MANAGER], true);
+        return $role === self::ADMIN;
+    }
+
+    /** Vai duoc xem bao cao, hoa don va phan tich khach hang. */
+    public static function canSeeAnalytics(string $role): bool
+    {
+        return in_array($role, self::CAN_SEE_ANALYTICS, true);
     }
 
     /** Chi quan tri duoc tao quan va tai khoan. */

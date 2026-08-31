@@ -26,16 +26,18 @@
            href="{{ route('admin.bookings.index') }}">Danh sách đặt bàn</a>
         <a class="nav-link {{ request()->routeIs('admin.guests.*') ? 'active' : '' }}"
            href="{{ route('admin.guests.index') }}">Tra cứu khách</a>
-        <a class="nav-link {{ request()->routeIs('admin.reports.*') ? 'active' : '' }}"
-           href="{{ route('admin.reports.index') }}">Báo cáo</a>
-        <a class="nav-link {{ request()->routeIs('admin.bookings.create') ? 'active' : '' }}"
-           href="{{ route('admin.bookings.create') }}">Đặt bàn hộ khách</a>
+        @if ($user->canSeeAnalytics())
+            <a class="nav-link {{ request()->routeIs('admin.reports.*') ? 'active' : '' }}"
+               href="{{ route('admin.reports.index') }}">Báo cáo</a>
+            <a class="nav-link {{ request()->routeIs('admin.bookings.create') ? 'active' : '' }}"
+               href="{{ route('admin.bookings.create') }}">Đặt bàn hộ khách</a>
 
-        <div class="nav-group">Khách hàng</div>
-        <a class="nav-link {{ request()->routeIs('admin.customers.*') ? 'active' : '' }}"
-           href="{{ route('admin.customers.index') }}">Phân tích khách hàng</a>
-        <a class="nav-link {{ request()->routeIs('admin.invoices.*') ? 'active' : '' }}"
-           href="{{ route('admin.invoices.index') }}">Hóa đơn</a>
+            <div class="nav-group">Khách hàng</div>
+            <a class="nav-link {{ request()->routeIs('admin.customers.*') ? 'active' : '' }}"
+               href="{{ route('admin.customers.index') }}">Phân tích khách hàng</a>
+            <a class="nav-link {{ request()->routeIs('admin.invoices.*') ? 'active' : '' }}"
+               href="{{ route('admin.invoices.index') }}">Hóa đơn</a>
+        @endif
 
         @if ($user->canManageSetup())
             <div class="nav-group">Cấu hình</div>

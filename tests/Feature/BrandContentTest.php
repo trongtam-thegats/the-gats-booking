@@ -7,6 +7,7 @@ use App\Models\BrandContent;
 use App\Models\User;
 use App\Support\Roles;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Carbon;
 use Tests\TestCase;
 
 /**
@@ -65,7 +66,7 @@ class BrandContentTest extends TestCase
 
     public function test_chu_da_sua_hien_tren_trang_khach(): void
     {
-        $this->actingAs($this->manager)
+        $this->actingAs($this->admin)
             ->put(route('admin.content.update', $this->brand), [
                 'locale' => 'vi',
                 'texts' => [
@@ -91,7 +92,7 @@ class BrandContentTest extends TestCase
             'value' => 'Chữ cũ',
         ]);
 
-        $this->actingAs($this->manager)
+        $this->actingAs($this->admin)
             ->put(route('admin.content.update', $this->brand), [
                 'locale' => 'vi',
                 'texts' => ['hero_title' => ''],
@@ -109,7 +110,7 @@ class BrandContentTest extends TestCase
 
     public function test_loi_nhan_het_ban_lay_theo_chu_da_sua(): void
     {
-        $this->actingAs($this->manager)
+        $this->actingAs($this->admin)
             ->put(route('admin.content.update', $this->brand), [
                 'locale' => 'vi',
                 'texts' => ['no_slots' => 'Hôm nay kín rồi, bạn gọi quán nhé.'],
@@ -123,12 +124,12 @@ class BrandContentTest extends TestCase
         $this->post(route('booking.store', $branch), [
             'customer_name' => 'Khách', 'customer_phone' => '0912345678',
             'party_size' => 4,
-            'booking_date' => \Illuminate\Support\Carbon::tomorrow()->toDateString(),
+            'booking_date' => Carbon::tomorrow()->toDateString(),
             'start_time' => '17:00',
         ]);
 
         $response = $this->getJson(route('booking.slots', $branch).'?'.http_build_query([
-            'date' => \Illuminate\Support\Carbon::tomorrow()->toDateString(),
+            'date' => Carbon::tomorrow()->toDateString(),
             'party_size' => 4,
         ]));
 
@@ -152,19 +153,17 @@ class BrandContentTest extends TestCase
         $this->assertDatabaseCount('brand_contents', 0);
     }
 
-    public function test_quan_ly_khong_sua_duoc_noi_dung_quan_khac(): void
+    public function test_quan_ly_khong_sua_duoc_noi_dung_quan_nao(): void
     {
-        $other = Brand::create([
-            'name' => 'Quán Khác', 'slug' => 'quan-khac',
-            'domain' => 'booking.quankhac.test', 'mark' => 'QK',
-            'accent_color' => '#7fb59b', 'is_active' => true,
-        ]);
-
+        // Tu 2026-08-31 noi dung trang khach la cau hinh, chi quan tri duoc sua -
+        // ke ca noi dung cua chinh quan minh.
         $this->actingAs($this->manager)
-            ->put(route('admin.content.update', $other), [
+            ->put(route('admin.content.update', $this->brand), [
                 'locale' => 'vi',
                 'texts' => ['hero_title' => 'Không được phép'],
             ])->assertForbidden();
+
+        $this->assertDatabaseCount('brand_contents', 0);
     }
 
     public function test_quan_tri_mo_duoc_trang_noi_dung(): void
@@ -177,13 +176,13 @@ class BrandContentTest extends TestCase
 
     public function test_ban_tieng_anh_va_tieng_viet_doc_lap_nhau(): void
     {
-        $this->actingAs($this->manager)
+        $this->actingAs($this->admin)
             ->put(route('admin.content.update', $this->brand), [
                 'locale' => 'vi',
                 'texts' => ['hero_title' => 'Giữ bàn'],
             ]);
 
-        $this->actingAs($this->manager)
+        $this->actingAs($this->admin)
             ->put(route('admin.content.update', $this->brand), [
                 'locale' => 'en',
                 'texts' => ['hero_title' => 'Reserve a table'],
@@ -199,7 +198,7 @@ class BrandContentTest extends TestCase
      */
     public function test_thieu_ban_tieng_anh_thi_dung_cau_mac_dinh_chu_khong_lay_tieng_viet(): void
     {
-        $this->actingAs($this->manager)
+        $this->actingAs($this->admin)
             ->put(route('admin.content.update', $this->brand), [
                 'locale' => 'vi',
                 'texts' => ['hero_title' => 'Giữ bàn ngay'],

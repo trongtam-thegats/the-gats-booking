@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Models\Brand;
 use App\Models\BrandContent;
 use App\Support\Locales;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -202,7 +203,7 @@ class ContentController extends AdminController
         }
     }
 
-    /** @return \Illuminate\Database\Eloquent\Collection<int, Brand> */
+    /** @return Collection<int, Brand> */
     protected function accessibleBrands(Request $request)
     {
         $user = $request->user();
@@ -225,7 +226,7 @@ class ContentController extends AdminController
     {
         $user = $request->user();
 
-        abort_unless($user->canWrite(), 403);
-        abort_unless($user->isAdmin() || (int) $user->brand_id === $brand->id, 403);
+        // Noi dung trang khach la cau hinh, chi quan tri duoc sua.
+        abort_unless($user->isAdmin(), 403);
     }
 }

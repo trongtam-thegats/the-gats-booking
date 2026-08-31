@@ -325,17 +325,18 @@ class ReportTest extends TestCase
         $this->assertSame(2, $this->report()['totals']['bookings']);
     }
 
-    public function test_vai_chi_xem_van_mo_duoc_bao_cao(): void
+    public function test_vai_chi_xem_khong_vao_duoc_bao_cao(): void
     {
+        // Tu 2026-08-31 vai chi xem chi con xem lich dat ban, khong xem phan tich.
         $viewer = User::create([
             'name' => 'Người xem', 'email' => 'xem@thegats.vn', 'password' => 'matkhau123',
             'role' => Roles::VIEWER, 'brand_id' => $this->brand->id, 'is_active' => true,
         ]);
 
-        $this->actingAs($viewer)
-            ->get(route('admin.reports.index'))
-            ->assertOk()
-            ->assertSee('Báo cáo đặt bàn');
+        $this->actingAs($viewer)->get(route('admin.reports.index'))->assertForbidden();
+
+        // Nhung van xem duoc lich dat ban.
+        $this->actingAs($viewer)->get(route('admin.bookings.index'))->assertOk();
     }
 
     // ---------- Trang hien thi ----------

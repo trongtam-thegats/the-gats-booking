@@ -60,6 +60,12 @@ class User extends Authenticatable
         return Roles::canManageSetup($this->role);
     }
 
+    /** Xem duoc bao cao, hoa don va phan tich khach hang. */
+    public function canSeeAnalytics(): bool
+    {
+        return Roles::canSeeAnalytics($this->role);
+    }
+
     public function roleLabel(): string
     {
         return Roles::label($this->role);
