@@ -316,7 +316,9 @@
         <div class="stat">
             <span>Khách nhận diện được</span>
             <b>{{ number_format($tongQuan['customers']) }}</b>
-            <small class="muted">trong {{ number_format($tongQuan['invoices']) }} hóa đơn</small>
+            <small class="muted">
+                từ {{ number_format($tongQuan['invoices_with_phone']) }} hóa đơn có số điện thoại
+            </small>
             @if ($doi = $nhanDoi('customers'))
                 <span class="delta {{ $doi['lop'] }}" title="{{ $doi['chuThich'] }}">{{ $doi['chu'] }}</span>
             @endif
@@ -326,7 +328,7 @@
             <b>{{ number_format($tongQuan['returning']) }}</b>
             <small class="muted">
                 {{ $tongQuan['customers'] ? round($tongQuan['returning'] / $tongQuan['customers'] * 100) : 0 }}%
-                — từ 2 hóa đơn trở lên
+                số khách, tức là ghé từ 2 lần trở lên
             </small>
             @if ($doi = $nhanDoi('returning'))
                 <span class="delta {{ $doi['lop'] }}" title="{{ $doi['chuThich'] }}">{{ $doi['chu'] }}</span>
