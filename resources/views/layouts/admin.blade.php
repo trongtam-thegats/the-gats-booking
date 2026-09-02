@@ -56,6 +56,8 @@
                href="{{ route('admin.users.index') }}">Tài khoản</a>
             <a class="nav-link {{ request()->routeIs('admin.settings.*') ? 'active' : '' }}"
                href="{{ route('admin.settings.index') }}">Cài đặt gửi tin</a>
+            <a class="nav-link {{ request()->routeIs('admin.bookings.deletions') ? 'active' : '' }}"
+               href="{{ route('admin.bookings.deletions') }}">Nhật ký xóa</a>
         @endif
 
         <div class="side-foot">

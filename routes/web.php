@@ -75,6 +75,13 @@ Route::prefix('quan-ly')->name('admin.')->middleware('admin.site')->group(functi
 
         // Cau hinh - chi quan tri (user chot 2026-08-31)
         Route::middleware('role:admin')->group(function () {
+            // Xoa han dat ban de bao cao va phan tich khach khong bi don sai lam
+            // lech. Chi quan tri, va moi lan xoa deu de lai mot dong nhat ky.
+            // "nhat-ky-xoa" co dau gach nen khong dinh vao route dat-ban/{booking}
+            // o tren (route do rang buoc [A-Za-z0-9]+).
+            Route::get('dat-ban/nhat-ky-xoa', [AdminBookingController::class, 'deletionLog'])->name('bookings.deletions');
+            Route::delete('dat-ban/{booking}', [AdminBookingController::class, 'destroy'])->name('bookings.destroy');
+
             // Khai bao dia diem, gio mo, khu vuc, ban
             Route::get('chi-nhanh', [BranchController::class, 'index'])->name('branches.index');
             Route::get('chi-nhanh/tao-moi', [BranchController::class, 'create'])->name('branches.create');
@@ -134,6 +141,8 @@ Route::middleware(['brand.site', 'guest.locale', 'guest.nguon'])->group(function
     Route::get('/ma/{booking}', [PublicBookingController::class, 'show'])->name('booking.show');
     Route::post('/ma/{booking}/huy', [PublicBookingController::class, 'cancel'])->name('booking.cancel');
 
-    Route::post('/dat-ban/{branch}', [PublicBookingController::class, 'store'])->name('booking.store');
+    Route::post('/dat-ban/{branch}', [PublicBookingController::class, 'store'])
+        ->middleware('throttle:dat-ban')
+        ->name('booking.store');
     Route::get('/api/{branch}/khung-gio', [PublicBookingController::class, 'slots'])->name('booking.slots');
 });

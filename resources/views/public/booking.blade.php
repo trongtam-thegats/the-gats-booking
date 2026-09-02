@@ -30,6 +30,7 @@
         'legend' => __('booking.form.slot_legend'),
         'noService' => __('booking.form.no_service_day'),
         'failed' => __('booking.form.slots_failed'),
+        'sending' => __('booking.form.sending'),
         'branch' => $branch->name,
     ];
 @endphp
@@ -257,6 +258,7 @@
     const messageBox = document.getElementById('slot-message');
     const guestStep  = document.getElementById('guest-step');
     const submitBtn  = document.getElementById('submit-btn');
+    const bookingForm = document.getElementById('booking-form');
 
     const valueDate  = document.getElementById('value-date');
     const valueParty = document.getElementById('value-party');
@@ -266,6 +268,11 @@
 
     let requestToken = 0;
     let inFlight = null;
+
+    // Da bam gui roi thi khong cho bam nua. Truoc day nut van sang trong luc
+    // cho may chu tra ve, khach tuong hut nen bam them - moi lan bam la mot
+    // don that su duoc tao.
+    let dangGui = false;
 
     // Nho lai ket qua da tai trong vong mot phut. Khach hay bam qua bam lai
     // giua vai ngay; lan quay lai khong can goi may chu nua.
@@ -289,7 +296,7 @@
         valueTime.textContent = startTime.value || '';
 
         const ready = Boolean(startTime.value);
-        submitBtn.disabled = !ready;
+        submitBtn.disabled = !ready || dangGui;
         guestStep.classList.toggle('is-open', ready);
 
         if (ready) {
@@ -463,6 +470,29 @@
 
     dateInput.addEventListener('change', () => { syncDayStrip(); syncHeadings(); loadSlots(); });
     partyInput.addEventListener('change', () => { syncPartyChips(); syncHeadings(); loadSlots(); });
+
+    // Chi cho gui mot lan. Nut khong mang thuoc tinh name nen tat di khong lam
+    // mat truong nao cua form.
+    bookingForm.addEventListener('submit', event => {
+        if (dangGui) {
+            event.preventDefault();
+            return;
+        }
+
+        dangGui = true;
+        submitBtn.disabled = true;
+        submitBtn.textContent = t.sending;
+    });
+
+    // Bam nut Quay lai cua trinh duyet: trang duoc khoi phuc nguyen trang thai
+    // dang khoa. Mo lai de khach con dat duoc don ke tiep.
+    window.addEventListener('pageshow', event => {
+        if (event.persisted) {
+            dangGui = false;
+            submitBtn.textContent = @json($brand->text('submit_label'));
+            syncHeadings();
+        }
+    });
 
     // Ket qua dau tien da duoc in san vao HTML; ghi vao bo nho tam de khach
     // quay lai lua chon nay cung khong phai goi may chu.

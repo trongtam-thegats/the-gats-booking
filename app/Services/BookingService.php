@@ -4,12 +4,14 @@ namespace App\Services;
 
 use App\Exceptions\BookingUnavailableException;
 use App\Models\Booking;
+use App\Models\BookingDeletion;
 use App\Models\Branch;
 use App\Models\DiningTable;
 use App\Models\GuestNote;
 use App\Models\User;
 use App\Services\Notifications\BookingNotifier;
 use App\Support\NguonDatBan;
+use App\Support\SoDienThoai;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
 
@@ -43,14 +45,32 @@ class BookingService
         $this->guardBookingWindow($branch, $date, $data['start_time'], $partySize, $actor);
         $this->guardBlockedGuest($branch, $data['customer_phone'], $actor);
 
+        // Don da co san neu day chi la mot lan bam lap. Gan trong closure ben
+        // duoi de phan sau biet duong khong gui thong bao them lan nua.
+        $daCo = null;
+
         // Khoa theo chi nhanh + ngay de hai khach dat cung luc khong an cung mot ban.
         $booking = DB::transaction(function () use (
-            $branch, $data, $date, $partySize, $startMin, $endMin, $actor
+            $branch, $data, $date, $partySize, $startMin, $endMin, $actor, &$daCo
         ) {
             $branch->bookings()
                 ->forDate($date)
                 ->lockForUpdate()
                 ->get(['id']);
+
+            // Phai nam SAU lockForUpdate: hai request bam cung mot khac se lan
+            // luot di qua day, neu kiem tra truoc khoa thi ca hai cung thay
+            // "chua co don nao" va cung tao moi.
+            //
+            // Chi ap cho khach tu dat. Nhan vien co ly do that de tao hai don
+            // cung so dien thoai cung gio - vi du tach doan lon ra hai ban rieng.
+            if ($actor === null) {
+                $daCo = $this->donTrungKhitGio($branch, $data['customer_phone'], $date, $startMin);
+
+                if ($daCo) {
+                    return $daCo;
+                }
+            }
 
             $free = $this->availability->availableTables(
                 $branch, $date, $startMin, $endMin, $data['area_id'] ?? null,
@@ -93,10 +113,51 @@ class BookingService
             return $booking;
         });
 
+        // Bam lap: tra lai chinh don cu de khach thay dung trang xac nhan da
+        // thay, va tuyet doi khong gui them mot email xac nhan thu hai.
+        if ($daCo) {
+            return $daCo->load(['branch', 'diningTables', 'area']);
+        }
+
         $booking->load(['branch', 'diningTables', 'area']);
         $this->notifier->send($booking, $booking->status === Booking::STATUS_CONFIRMED ? 'confirmed' : 'created');
 
         return $booking;
+    }
+
+    /**
+     * Don dang con hieu luc cua chinh so dien thoai nay, cho dung khung gio ay.
+     *
+     * Dinh nghia trung co y hep: cung quan, cung so, cung ngay, cung khung gio,
+     * va don cu con hieu luc. Hep den muc khong the bat nham - mot so dien thoai
+     * khong co ly do gi de giu hai ban cho cung mot khung gio, vi doan dong hon
+     * thi he thong tu ghep ban chu khong bat khach dat hai lan.
+     *
+     * Da tung dinh bat rong hon: "cung so, cung ngay, gui cach nhau duoi hai
+     * phut" - ke ca khi khac khung gio. Bo di, vi no nuot mat don that: khach
+     * dat 17:00 roi dat them 21:00 cho hiep hai la chuyen co that, va cai gia
+     * cua viec bat nham la khach bi day sang trang xac nhan cua mot don khac
+     * ma khong he duoc bao gi. Truong hop doi khung gio giua hai lan bam da co
+     * lop khoa nut o trang khach lo, va no lo dung cho hon.
+     */
+    protected function donTrungKhitGio(Branch $branch, string $phone, string $date, int $startMin): ?Booking
+    {
+        $chuan = SoDienThoai::chuan($phone);
+
+        if ($chuan === '') {
+            return null;
+        }
+
+        // Don cu luu so nguyen van khach go, don moi luu so da chuan hoa.
+        $soCanTim = array_values(array_unique(array_filter([$chuan, trim($phone)])));
+
+        return $branch->bookings()
+            ->blocking()
+            ->forDate($date)
+            ->whereIn('customer_phone', $soCanTim)
+            ->whereTime('start_time', $this->availability->toTimeString($startMin))
+            ->latest('id')
+            ->first();
     }
 
     /**
@@ -309,6 +370,51 @@ class BookingService
         $this->notifier->send($booking->fresh(['branch', 'diningTables']), 'cancelled');
 
         return $booking;
+    }
+
+    /**
+     * Xoa han mot dat ban khoi he thong (chi quan tri goi toi).
+     *
+     * Khac han voi huy: huy giu lai dong du lieu va van hien trong bao cao voi
+     * trang thai "da huy". Xoa la de dung cho don SAI - don trung, don go nham,
+     * don thu - nhung thu khong duoc phep lam lech bao cao va phan tich khach.
+     *
+     * Dong bookings bien mat that; ban, nhat ky gui tin di theo bang khoa ngoai
+     * cascade. Ban sao day du duoc cat sang bang booking_deletions truoc khi xoa.
+     */
+    public function delete(Booking $booking, string $reason, User $actor): BookingDeletion
+    {
+        return DB::transaction(function () use ($booking, $reason, $actor) {
+            $booking->loadMissing(['branch', 'diningTables']);
+
+            $nhatKy = BookingDeletion::create([
+                'code' => $booking->code,
+                'branch_id' => $booking->branch_id,
+                'branch_name' => $booking->branch?->name,
+                'customer_name' => $booking->customer_name,
+                'customer_phone' => $booking->customer_phone,
+                'party_size' => $booking->party_size,
+                'booking_date' => $booking->booking_date->toDateString(),
+                'start_time' => $booking->start_time,
+                'status' => $booking->status,
+                'source' => $booking->source,
+                'du_lieu' => [
+                    // Gia tri tho tu CSDL, de dung lai la khop nguyen ven.
+                    'booking' => $booking->getAttributes(),
+                    'dining_table_ids' => $booking->diningTables->pluck('id')->all(),
+                    'dining_table_codes' => $booking->diningTables->pluck('code')->all(),
+                ],
+                'deleted_by' => $actor->id,
+                'deleted_by_name' => $actor->name,
+                'reason' => $reason,
+            ]);
+
+            // Nha ban ra truoc cho tuong minh, du khoa ngoai cascade cung don not.
+            $booking->diningTables()->detach();
+            $booking->delete();
+
+            return $nhatKy;
+        });
     }
 
     public function markSeated(Booking $booking): Booking

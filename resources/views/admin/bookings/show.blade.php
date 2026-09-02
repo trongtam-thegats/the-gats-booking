@@ -240,4 +240,63 @@
             </table>
         </div>
     </div>
+
+    @if (auth()->user()->isAdmin())
+        {{-- Xoa han: chi quan tri, va co y dat cuoi trang cho kho bam nham. --}}
+        <div class="card">
+            <h2>Xóa vĩnh viễn</h2>
+            <p class="sub">
+                Dùng khi đơn này <b>sai</b> — đơn trùng, gõ nhầm, đơn thử — và không được phép
+                nằm trong báo cáo hay phân tích khách hàng. Khác với <b>hủy</b>: đơn hủy vẫn
+                còn trong số liệu với trạng thái “đã hủy”.
+            </p>
+
+            <div class="alert alert-error">
+                Đơn sẽ biến mất khỏi hệ thống cùng bàn đang giữ và nhật ký gửi tin.
+                Một bản sao đầy đủ được lưu ở <a href="{{ route('admin.bookings.deletions') }}">Nhật ký xóa</a>
+                kèm tên người xóa và lý do.
+            </div>
+
+            <form method="post" action="{{ route('admin.bookings.destroy', $booking) }}" id="form-xoa">
+                @csrf
+                @method('delete')
+
+                <div class="form-grid">
+                    <div class="field">
+                        <label for="reason_xoa">Lý do xóa <span class="muted small">(bắt buộc)</span></label>
+                        <input type="text" id="reason_xoa" name="reason" required minlength="3" maxlength="200"
+                               value="{{ old('reason') }}" placeholder="Đơn trùng do khách bấm hai lần…">
+                        @error('reason')<span class="small" style="color:var(--danger)">{{ $message }}</span>@enderror
+                    </div>
+                    <div class="field">
+                        <label for="xac_nhan_ma">Gõ lại mã <b>{{ $booking->code }}</b> để xác nhận</label>
+                        <input type="text" id="xac_nhan_ma" autocomplete="off" spellcheck="false"
+                               placeholder="{{ $booking->code }}">
+                    </div>
+                </div>
+
+                <button class="btn btn-danger" type="submit" style="margin-top:14px">
+                    Xóa vĩnh viễn {{ $booking->code }}
+                </button>
+            </form>
+        </div>
+
+        @push('scripts')
+        <script>
+        (function () {
+            const form = document.getElementById('form-xoa');
+            const oMa  = document.getElementById('xac_nhan_ma');
+            const ma   = @json($booking->code);
+
+            form.addEventListener('submit', event => {
+                if (oMa.value.trim().toUpperCase() !== ma) {
+                    event.preventDefault();
+                    oMa.focus();
+                    alert('Gõ đúng mã ' + ma + ' thì mới xóa được. Đây là thao tác không hoàn tác lại được.');
+                }
+            });
+        })();
+        </script>
+        @endpush
+    @endif
 @endsection

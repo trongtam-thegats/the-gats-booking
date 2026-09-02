@@ -44,6 +44,7 @@ return [
         'note_placeholder' => 'Special occasion, preferred area, any requests…',
 
         'cta_idle' => 'Pick a date and time',
+        'sending' => 'Sending…',
         'cta_lead' => 'Book at least :minutes minutes ahead',
         'guests' => ':count guests',
         'submit' => 'Book a table',
@@ -130,6 +131,7 @@ return [
         'day_full' => 'We are fully booked on this date. Please try another day.',
         'too_far_days' => 'We only take bookings up to :days days ahead.',
         'party_call' => 'For a large party, please call :phone so we can arrange it.',
+        'too_many' => 'That is a lot of booking attempts in a row. Please wait a moment and try again, or call us directly.',
     ],
 
     'notify' => [

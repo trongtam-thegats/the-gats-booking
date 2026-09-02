@@ -44,6 +44,7 @@ return [
         'note_placeholder' => 'Dịp đặc biệt, khu vực mong muốn, yêu cầu riêng…',
 
         'cta_idle' => 'Chọn ngày và giờ',
+        'sending' => 'Đang gửi…',
         'cta_lead' => 'Đặt trước tối thiểu :minutes phút',
         'guests' => ':count khách',
         'submit' => 'Đặt bàn',
@@ -130,6 +131,7 @@ return [
         'day_full' => 'Ngày này đã kín bàn. Bạn thử chọn ngày khác giúp mình nhé.',
         'too_far_days' => 'Quán chỉ nhận đặt trước tối đa :days ngày.',
         'party_call' => 'Đoàn đông vui lòng gọi :phone để được sắp xếp riêng.',
+        'too_many' => 'Bạn vừa gửi khá nhiều lượt đặt bàn. Chờ một chút rồi thử lại, hoặc gọi trực tiếp cho quán giúp mình nhé.',
     ],
 
     'notify' => [

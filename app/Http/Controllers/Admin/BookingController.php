@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Exceptions\BookingUnavailableException;
 use App\Models\Booking;
+use App\Models\BookingDeletion;
 use App\Models\Branch;
 use App\Services\AvailabilityService;
 use App\Services\BookingService;
@@ -229,6 +230,43 @@ class BookingController extends AdminController
         }
 
         return back()->with('status', 'Đã cập nhật đặt bàn '.$booking->code.'.');
+    }
+
+    /**
+     * Xoa han mot dat ban. Chi quan tri, va route da chan o tang middleware.
+     *
+     * Bat buoc nhap ly do: dong nhat ky con lai sau khi don bien mat chi co gia
+     * tri neu doc duoc vi sao no bi xoa.
+     */
+    public function destroy(Request $request, Booking $booking)
+    {
+        $this->authorizeBranch($request, $booking->branch_id);
+
+        $data = $request->validate([
+            'reason' => ['required', 'string', 'min:3', 'max:200'],
+        ], [], ['reason' => 'lý do xóa']);
+
+        $code = $booking->code;
+
+        $this->bookings->delete($booking, $data['reason'], $request->user());
+
+        return redirect()
+            ->route('admin.bookings.index')
+            ->with('status', 'Đã xóa vĩnh viễn đặt bàn '.$code.'. Xem lại ở Nhật ký xóa.');
+    }
+
+    /** Nhat ky cac don da bi xoa han - doi chung khi so lieu bao cao lech. */
+    public function deletionLog(Request $request)
+    {
+        $branches = $this->accessibleBranches($request);
+
+        $deletions = BookingDeletion::query()
+            ->whereIn('branch_id', $branches->pluck('id'))
+            ->with('deletedBy')
+            ->latest('id')
+            ->paginate(50);
+
+        return view('admin.bookings.deletions', compact('deletions'));
     }
 
     public function updateNote(Request $request, Booking $booking)
