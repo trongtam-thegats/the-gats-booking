@@ -48,5 +48,13 @@ class AppServiceProvider extends ServiceProvider
             ->response(fn () => back()
                 ->withInput()
                 ->withErrors(['start_time' => __('booking.errors.too_many')])));
+
+        // Tu huy don. Muon huy don cua nguoi khac thi phai co dung ca ma dat ban
+        // lan so dien thoai, nen day chi la lop phong ho thu hai - nhung mot
+        // duong lam thay doi du lieu thi khong nen de mo tuy y.
+        RateLimiter::for('huy-dat-ban', fn (Request $request) => Limit::perMinute(10)
+            ->by($request->ip())
+            ->response(fn () => back()
+                ->withErrors(['customer_phone' => __('booking.errors.too_many')])));
     }
 }

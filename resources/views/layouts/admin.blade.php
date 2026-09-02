@@ -91,5 +91,61 @@
     </main>
 </div>
 @stack('scripts')
+
+{{-- Khoa nut sau lan bam dau, cho moi form gui du lieu trong khu quan ly.
+
+     Sau su co don trung 2/9: mot cu bam doi cua le tan tren form "Dat ban ho
+     khach" van sinh ra hai don, vi lop chan don trung co y mien tru nhan vien.
+     Dat o day thay vi tung trang de ca lop loi nay bi bit mot the.
+
+     Phai nam SAU @stack('scripts'): cac trang tu dat bo bat su kien submit cua
+     rieng minh (vi du o xac nhan xoa dat ban), chung phai duoc dang ky truoc de
+     con chan lai kip. --}}
+<script>
+(function () {
+    var forms = document.querySelectorAll('form[method="post" i]');
+
+    function nutCua(form) {
+        return form.querySelectorAll('button[type="submit"], button:not([type])');
+    }
+
+    forms.forEach(function (form) {
+        form.addEventListener('submit', function (event) {
+            // Hop thoai xac nhan bi bam Huy, hoac trang tu chan lai bang
+            // preventDefault: khong khoa gi ca, neu khong nut se ket cung du
+            // form chua he duoc gui di.
+            if (event.defaultPrevented) {
+                return;
+            }
+
+            if (form.dataset.dangGui === '1') {
+                event.preventDefault();
+                return;
+            }
+
+            form.dataset.dangGui = '1';
+
+            // Tat nut sau mot nhip, de trinh duyet kip gui kem name/value cua
+            // chinh nut vua bam.
+            window.setTimeout(function () {
+                nutCua(form).forEach(function (nut) { nut.disabled = true; });
+            }, 0);
+        });
+    });
+
+    // Bam Quay lai cua trinh duyet: trang duoc khoi phuc nguyen trang thai dang
+    // khoa. Mo lai de con thao tac tiep.
+    window.addEventListener('pageshow', function (event) {
+        if (! event.persisted) {
+            return;
+        }
+
+        forms.forEach(function (form) {
+            form.dataset.dangGui = '0';
+            nutCua(form).forEach(function (nut) { nut.disabled = false; });
+        });
+    });
+})();
+</script>
 </body>
 </html>

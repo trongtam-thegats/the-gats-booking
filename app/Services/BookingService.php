@@ -339,16 +339,62 @@ class BookingService
         }
     }
 
+    /**
+     * Xac nhan mot dat ban, ke ca don truoc do da huy hoac da bi danh dau
+     * khach khong den.
+     *
+     * Huy va "khong den" deu nha ban ra cho khach khac. Nen khi dua don quay
+     * lai, phai giu bàn lai - truoc day khong lam viec nay, don duoc xac nhan
+     * lai ma khong cam bàn nao, khach van nhan tin bao da xac nhan, roi den noi
+     * khong co cho ngoi. Neu khung gio da kin that thi bao loi cho nhan vien
+     * biet, chu khong xac nhan suong.
+     *
+     * @throws BookingUnavailableException
+     */
     public function confirm(Booking $booking, User $actor): Booking
     {
-        $booking->update([
-            'status' => Booking::STATUS_CONFIRMED,
-            'confirmed_by' => $actor->id,
-            'confirmed_at' => now(),
-            'cancelled_at' => null,
-            'cancel_reason' => null,
-            'cancelled_by_type' => null,
-        ]);
+        DB::transaction(function () use ($booking, $actor) {
+            $branch = $booking->branch;
+            $date = $booking->booking_date->toDateString();
+
+            // Chi phai giu lai bàn khi don dang trang tay. Don cho duyet thi da
+            // cam bàn tu luc tao, dung dong vao ket qua xep bàn cua no.
+            if ($booking->diningTables()->count() === 0) {
+                $branch->bookings()->forDate($date)->lockForUpdate()->get(['id']);
+
+                $openMin = $this->availability->openMinutes($branch);
+                $startMin = $this->availability->normalize(
+                    $this->availability->toMinutes((string) $booking->start_time),
+                    $openMin
+                );
+                $endMin = $this->availability->endMinutesFor($branch, $startMin);
+
+                // Nhan vien dang thao tac nen duoc xep ca vao khu chi nhan dat
+                // qua dien thoai, giong nhu khi ho dat ho khach.
+                $free = $this->availability->availableTables(
+                    $branch, $date, $startMin, $endMin, $booking->area_id, $booking->id
+                );
+
+                $tables = $this->availability->pickTables($free, (int) $booking->party_size);
+
+                if (! $tables) {
+                    throw new BookingUnavailableException(
+                        __('booking.errors.no_tables', ['count' => $booking->party_size])
+                    );
+                }
+
+                $booking->diningTables()->sync(collect($tables)->pluck('id')->all());
+            }
+
+            $booking->update([
+                'status' => Booking::STATUS_CONFIRMED,
+                'confirmed_by' => $actor->id,
+                'confirmed_at' => now(),
+                'cancelled_at' => null,
+                'cancel_reason' => null,
+                'cancelled_by_type' => null,
+            ]);
+        });
 
         $this->notifier->send($booking->fresh(['branch', 'diningTables']), 'confirmed');
 

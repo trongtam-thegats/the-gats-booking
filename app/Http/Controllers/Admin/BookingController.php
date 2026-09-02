@@ -147,9 +147,21 @@ class BookingController extends AdminController
     public function confirm(Request $request, Booking $booking)
     {
         $this->authorizeBranch($request, $booking->branch_id);
-        $this->bookings->confirm($booking, $request->user());
 
-        return back()->with('status', 'Đã xác nhận '.$booking->code.' và gửi thông báo cho khách.');
+        $trangTay = $booking->diningTables()->count() === 0;
+
+        try {
+            $this->bookings->confirm($booking, $request->user());
+        } catch (BookingUnavailableException $e) {
+            // Don da huy / khong den nay khong con bàn de giu lai. Bao that
+            // thay vi xac nhan suong roi de khach den moi biet khong co cho.
+            return back()->withErrors(['confirm' => $e->getMessage()]);
+        }
+
+        return back()->with('status', $trangTay
+            ? 'Đã xác nhận '.$booking->code.', giữ lại bàn '.$booking->fresh(['diningTables'])->tableCodes()
+                .' và gửi thông báo cho khách.'
+            : 'Đã xác nhận '.$booking->code.' và gửi thông báo cho khách.');
     }
 
     public function cancel(Request $request, Booking $booking)

@@ -137,12 +137,25 @@ Route::prefix('quan-ly')->name('admin.')->middleware('admin.site')->group(functi
 
 Route::middleware(['brand.site', 'guest.locale', 'guest.nguon'])->group(function () {
     Route::get('/', [PublicBookingController::class, 'index'])->name('home');
-    Route::get('/tra-cuu', [PublicBookingController::class, 'lookup'])->name('booking.lookup');
+    // Tra cuu can dung ca ma lan so dien thoai, nen kho do; tran o day de chan
+    // viec do hang loat, con nguong thi de rong hon nhu cau that cua mot nguoi.
+    Route::get('/tra-cuu', [PublicBookingController::class, 'lookup'])
+        ->middleware('throttle:20,1')
+        ->name('booking.lookup');
+
     Route::get('/ma/{booking}', [PublicBookingController::class, 'show'])->name('booking.show');
-    Route::post('/ma/{booking}/huy', [PublicBookingController::class, 'cancel'])->name('booking.cancel');
+
+    Route::post('/ma/{booking}/huy', [PublicBookingController::class, 'cancel'])
+        ->middleware('throttle:huy-dat-ban')
+        ->name('booking.cancel');
 
     Route::post('/dat-ban/{branch}', [PublicBookingController::class, 'store'])
         ->middleware('throttle:dat-ban')
         ->name('booking.store');
-    Route::get('/api/{branch}/khung-gio', [PublicBookingController::class, 'slots'])->name('booking.slots');
+
+    // Khach doi ngay va so nguoi lien tuc trong luc chon, moi lan la mot lan
+    // goi. Nguong phai du rong cho mot buoi chon that, chi chan viec cao du lieu.
+    Route::get('/api/{branch}/khung-gio', [PublicBookingController::class, 'slots'])
+        ->middleware('throttle:60,1')
+        ->name('booking.slots');
 });

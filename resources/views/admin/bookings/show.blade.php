@@ -29,10 +29,21 @@
         <h2>Thao tác</h2>
         <p class="sub">Xác nhận sẽ gửi tin cho khách qua các kênh đang bật.</p>
         <div class="row">
-            @if (in_array($booking->status, [\App\Models\Booking::STATUS_PENDING, \App\Models\Booking::STATUS_CANCELLED]))
-                <form method="post" action="{{ route('admin.bookings.confirm', $booking) }}">
+            {{-- Don da huy hoac da danh dau khong den van dua ve lai duoc: nhan vien
+                 bam nham la chuyen thuong, va khach goi lai doi y cung vay. Buoc xac
+                 nhan se tu giu lai bàn, hoac bao loi neu khung gio da kin. --}}
+            @php($daNhaBan = in_array($booking->status, [
+                \App\Models\Booking::STATUS_CANCELLED,
+                \App\Models\Booking::STATUS_NO_SHOW,
+            ], true))
+
+            @if ($booking->status === \App\Models\Booking::STATUS_PENDING || $daNhaBan)
+                <form method="post" action="{{ route('admin.bookings.confirm', $booking) }}"
+                      @if ($daNhaBan) onsubmit="return confirm('Đưa {{ $booking->code }} trở lại và giữ bàn cho khách?')" @endif>
                     @csrf
-                    <button class="btn btn-ok" type="submit">Xác nhận đặt bàn</button>
+                    <button class="btn btn-ok" type="submit">
+                        {{ $daNhaBan ? 'Đưa trở lại và giữ bàn' : 'Xác nhận đặt bàn' }}
+                    </button>
                 </form>
             @endif
 
