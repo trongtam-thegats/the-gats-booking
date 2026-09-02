@@ -4,14 +4,16 @@ namespace App\Services;
 
 use App\Models\Booking;
 use App\Models\GuestNote;
+use App\Models\PosCustomer;
+use App\Support\TenKhach;
 use Illuminate\Support\Collection;
 
 /**
  * Ho so khach dung cho le tan: khach nay da den bao nhieu lan, co hay bo hen
  * khong, lan gan nhat ngoi dau.
  *
- * Khong co bang khach hang rieng - tat ca suy ra tu lich su dat ban, nen
- * khong bao gio lech voi du lieu that.
+ * Cac con so deu suy ra tu lich su dat ban nen khong bao gio lech voi du lieu
+ * that. Rieng ten va hang the thi doi chieu them voi the khach hang ben POS.
  */
 class GuestProfileService
 {
@@ -47,9 +49,16 @@ class GuestProfileService
             ? GuestNote::where('brand_id', $brandId)->where('phone', $digits)->first()
             : null;
 
+        // The khach hang ben POS: nguon ten dang tin hon ten khach tu go luc
+        // dat ban, va la cho duy nhat co hang the va sinh nhat.
+        $card = PosCustomer::where('phone', $digits)->first();
+
         return [
             'phone' => $digits,
-            'name' => $note?->name ?? $bookings->first()?->customer_name,
+            // Quy tac chon ten dung chung toan he thong, xem App\Support\TenKhach.
+            'name' => TenKhach::chon($note, $card, $bookings->first()?->customer_name),
+            'name_source' => TenKhach::nguon($note, $card),
+            'card' => $card,
             'bookings' => $bookings,
             'total' => $bookings->count(),
             'completed' => $visited->count(),

@@ -68,6 +68,13 @@ Route::prefix('quan-ly')->name('admin.')->middleware('admin.site')->group(functi
             Route::post('dat-ban/{booking}/ghi-chu', [AdminBookingController::class, 'updateNote'])->name('bookings.note');
             Route::post('dat-ban/{booking}/doi-lich', [AdminBookingController::class, 'reschedule'])->name('bookings.reschedule');
             Route::post('khach/ghi-chu', [GuestController::class, 'saveNote'])->name('guests.note');
+
+            // Tra nhanh ten khach theo so dien thoai cho form dat ban ho khach.
+            // Chi mo trong nhom nay - dua ra trang khach thi bat ky ai cung do
+            // duoc ten cua toan bo khach hang.
+            Route::get('khach/tra-nhanh', [GuestController::class, 'quickLookup'])
+                ->middleware('throttle:60,1')
+                ->name('guests.quick');
             Route::post('khach-hang/{phone}/danh-dau', [CustomerInsightController::class, 'review'])
                 ->where('phone', '[0-9+]+')->name('customers.review');
 

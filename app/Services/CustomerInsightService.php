@@ -7,6 +7,7 @@ use App\Models\Branch;
 use App\Models\GuestNote;
 use App\Models\Invoice;
 use App\Models\PosCustomer;
+use App\Support\TenKhach;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
@@ -191,6 +192,10 @@ class CustomerInsightService
                 $k['booking'] = $datBan[$k['phone']] ?? null;
                 $k['card'] = $the[$k['phone']] ?? null;
                 $k['note'] = $ghiChu[$k['phone']] ?? null;
+                // Ten chuan: uu tien ghi chu cua quan, roi den the khach hang,
+                // cuoi cung moi den ten tren hoa don. Nho vay mot nguoi go ten
+                // ba kieu khac nhau van chi hien mot ten trong bao cao.
+                $k['name'] = TenKhach::chon($k['note'], $k['card'], $k['name']);
                 $k['review'] = $this->trangThaiXemXet($k['note'], $k['last_at'], $k['booking']);
                 $k['trang_thai'] = $this->tinhTrangHienThi($k['segment'], $k['note'], $k['review']);
 
@@ -361,11 +366,13 @@ class CustomerInsightService
 
         $datBan = $this->chiSoDatBan($don);
         $ghiChu = $this->ghiChuKhach([$phone], $branchIds)->get($phone);
+        $the = PosCustomer::where('phone', $phone)->first();
 
         return [
             'phone' => $phone,
-            'name' => $co['name'],
-            'card' => PosCustomer::where('phone', $phone)->first(),
+            // Cung quy tac chon ten voi trang danh sach, xem App\Support\TenKhach.
+            'name' => TenKhach::chon($ghiChu, $the, $co['name'], $don->first()?->customer_name),
+            'card' => $the,
             'note' => $ghiChu,
             'review' => $xemXet = $this->trangThaiXemXet($ghiChu, $co['last_at'], [
                 'last_date' => $don->max('booking_date'),

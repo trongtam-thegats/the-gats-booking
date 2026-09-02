@@ -4,6 +4,8 @@ namespace App\Http\Controllers\Admin;
 
 use App\Models\GuestNote;
 use App\Services\GuestProfileService;
+use App\Support\SoDienThoai;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
@@ -34,6 +36,48 @@ class GuestController extends AdminController
         }
 
         return view('admin.guests.index', compact('term', 'phone', 'results', 'profile'));
+    }
+
+    /**
+     * Tra nhanh mot so dien thoai, tra ve JSON cho form dat ban ho khach.
+     *
+     * Chi mo cho vai duoc phep dat ban (xem route). Co y KHONG dua ra trang
+     * khach: trang do ai cung vao duoc, de lo ra thi bat ky ai cung do duoc
+     * ten cua toan bo khach hang bang cach go tung so mot.
+     */
+    public function quickLookup(Request $request): JsonResponse
+    {
+        $data = $request->validate(['phone' => ['required', 'string', 'max:30']]);
+
+        $phone = SoDienThoai::chuan($data['phone']);
+
+        // Chua go du so thi khoan tra, tranh tra ve ket qua cua mot so khac.
+        if (strlen((string) preg_replace('/\D/', '', $phone)) < 8) {
+            return response()->json(['found' => false]);
+        }
+
+        $ho = $this->guests->forPhone(
+            $phone,
+            $request->user()->visibleBranchIds(),
+            $this->brandIdFor($request, GuestNote::normalize($phone))
+        );
+
+        $the = $ho['card'];
+        $ghiChu = $ho['note'];
+
+        return response()->json([
+            'found' => filled($ho['name']) || $ho['total'] > 0 || $the !== null,
+            'name' => $ho['name'],
+            'name_source' => $ho['name_source'],
+            'tier' => $the?->tier,
+            'visits' => $ho['completed'],
+            'bookings' => $ho['total'],
+            'no_show' => $ho['no_show'],
+            'last_visit' => $ho['last_visit'],
+            'vip' => (bool) $ghiChu?->is_vip,
+            'blocked' => (bool) $ghiChu?->is_blocked,
+            'note' => $ghiChu?->note,
+        ]);
     }
 
     public function saveNote(Request $request)

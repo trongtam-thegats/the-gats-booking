@@ -75,13 +75,19 @@
                 </div>
             @endif
 
-            <div class="field">
-                <label for="customer_name">Họ tên khách</label>
-                <input type="text" id="customer_name" name="customer_name" value="{{ old('customer_name') }}" required>
-            </div>
+            {{-- So dien thoai dat truoc ho ten: go so xong la ten tu dien vao
+                 tu danh sach khach hang, khoi phai go lai. --}}
             <div class="field">
                 <label for="customer_phone">Số điện thoại</label>
-                <input type="tel" id="customer_phone" name="customer_phone" value="{{ old('customer_phone') }}" required>
+                <input type="tel" id="customer_phone" name="customer_phone" value="{{ old('customer_phone') }}"
+                       autocomplete="off" required>
+                <span class="small muted" id="khach-tom-tat"></span>
+            </div>
+            <div class="field">
+                <label for="customer_name">Họ tên khách</label>
+                <input type="text" id="customer_name" name="customer_name" value="{{ old('customer_name') }}"
+                       autocomplete="off" required>
+                <span class="small" id="khach-ten-khac"></span>
             </div>
             <div class="field">
                 <label for="customer_email">Email</label>
@@ -96,3 +102,138 @@
         <button class="btn" type="submit" style="margin-top:16px">Tạo đặt bàn</button>
     </form>
 @endsection
+
+@push('scripts')
+<script>
+(function () {
+    var oSdt    = document.getElementById('customer_phone');
+    var oTen    = document.getElementById('customer_name');
+    var tomTat  = document.getElementById('khach-tom-tat');
+    var tenKhac = document.getElementById('khach-ten-khac');
+    var duongDan = @json(route('admin.guests.quick'));
+
+    var hen = null;
+    var lanGoi = 0;
+    var soDaTra = '';
+
+    function xoaGoiY() {
+        tomTat.textContent = '';
+        tomTat.className = 'small muted';
+        tenKhac.textContent = '';
+        tenKhac.className = 'small';
+    }
+
+    function moTa(k) {
+        var y = [];
+
+        if (k.visits > 0) {
+            y.push('đã ghé ' + k.visits + ' lần');
+        } else if (k.bookings > 0) {
+            y.push('đã đặt ' + k.bookings + ' lần');
+        }
+
+        if (k.last_visit) y.push('gần nhất ' + k.last_visit);
+        if (k.tier)      y.push('hạng ' + k.tier);
+        if (k.no_show)   y.push(k.no_show + ' lần hẹn mà không tới');
+
+        return y.join(' · ');
+    }
+
+    function hien(k) {
+        if (!k.found) {
+            tomTat.textContent = 'Khách mới, chưa có trong danh sách.';
+            tomTat.className = 'small muted';
+            return;
+        }
+
+        tomTat.textContent = moTa(k) || 'Đã có trong danh sách khách hàng.';
+        tomTat.className = 'small muted';
+
+        // Số bị chặn đặt online, hoặc khách hay bỏ hẹn: nói rõ trước khi giữ bàn.
+        if (k.blocked || k.no_show >= 2) {
+            tomTat.textContent = (k.blocked ? 'Số này đang bị chặn đặt online. ' : '') + tomTat.textContent;
+            tomTat.className = 'small';
+            tomTat.style.color = 'var(--danger)';
+        } else {
+            tomTat.style.color = '';
+        }
+
+        if (!k.name) {
+            return;
+        }
+
+        // Ô tên còn trống thì điền luôn. Đã có chữ rồi thì không đè lên -
+        // lễ tân có thể đang cố tình ghi khác đi cho lần đặt này.
+        if (oTen.value.trim() === '') {
+            oTen.value = k.name;
+            tenKhac.textContent = 'Lấy từ ' + (k.name_source || 'lịch sử đặt bàn') + '.';
+            tenKhac.className = 'small muted';
+            return;
+        }
+
+        if (oTen.value.trim().toLowerCase() !== k.name.toLowerCase()) {
+            tenKhac.textContent = '';
+            tenKhac.className = 'small muted';
+            tenKhac.append(document.createTextNode('Trong ' + (k.name_source || 'lịch sử') + ' ghi là “' + k.name + '”. '));
+
+            var nut = document.createElement('button');
+            nut.type = 'button';
+            nut.className = 'btn btn-ghost btn-sm';
+            nut.textContent = 'Dùng tên này';
+            nut.addEventListener('click', function () {
+                oTen.value = k.name;
+                tenKhac.textContent = 'Đã dùng tên trong ' + (k.name_source || 'lịch sử') + '.';
+            });
+
+            tenKhac.appendChild(nut);
+        }
+    }
+
+    async function tra() {
+        var so = oSdt.value.trim();
+
+        if (so.replace(/\D/g, '').length < 8) {
+            soDaTra = '';
+            xoaGoiY();
+            return;
+        }
+
+        if (so === soDaTra) {
+            return;
+        }
+
+        soDaTra = so;
+        var thePhieu = ++lanGoi;
+
+        try {
+            var res = await fetch(duongDan + '?phone=' + encodeURIComponent(so), {
+                headers: { 'Accept': 'application/json' },
+            });
+
+            if (!res.ok) { return; }
+
+            var k = await res.json();
+
+            // Lễ tân đã gõ tiếp số khác thì bỏ qua kết quả cũ.
+            if (thePhieu !== lanGoi) { return; }
+
+            hien(k);
+        } catch (e) {
+            // Tra cứu hỏng thì im lặng: đây là tiện ích, không được cản việc đặt bàn.
+        }
+    }
+
+    oSdt.addEventListener('input', function () {
+        window.clearTimeout(hen);
+        hen = window.setTimeout(tra, 400);
+    });
+
+    oSdt.addEventListener('change', tra);
+
+    // Số đã điền sẵn (khách quay lại form sau khi có lỗi) thì tra luôn.
+    if (oSdt.value.trim() !== '') {
+        tra();
+    }
+})();
+</script>
+@endpush
