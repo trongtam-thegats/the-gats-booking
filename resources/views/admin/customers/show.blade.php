@@ -98,6 +98,25 @@
             <small class="muted">vắng {{ $co['days_since'] ?? '—' }} ngày</small>
         </div>
         <div class="stat">
+            <span>Thường ngồi</span>
+            @php($phut = $co['dwell_median'])
+            <b>
+                @if ($phut === null)
+                    —
+                @elseif ($phut >= 60)
+                    {{ intdiv($phut, 60) }}<small>g</small>{{ $phut % 60 ? sprintf('%02d', $phut % 60) : '' }}
+                @else
+                    {{ $phut }}<small> phút</small>
+                @endif
+            </b>
+            <small class="muted">{{ $phut === null ? 'chưa đủ dữ liệu' : 'trung vị mỗi lần ghé' }}</small>
+        </div>
+        <div class="stat">
+            <span>Hay đi mấy người</span>
+            <b>{{ $co['party_mode'] ?? '—' }}<small>{{ $co['party_mode'] ? ' người' : '' }}</small></b>
+            <small class="muted">tổng {{ number_format($co['guests']) }} lượt khách</small>
+        </div>
+        <div class="stat">
             <span>Xem xét</span>
             <b style="font-size:19px">
                 <span class="pill {{ $mauXemXet[$ho['review']] }}">{{ Insight::XEM_XET[$ho['review']] }}</span>
@@ -180,6 +199,8 @@
             @foreach ([
                 'weekday' => 'Hay ghé thứ mấy',
                 'hour' => 'Khung giờ thanh toán',
+                'dwell' => 'Thường ngồi bao lâu',
+                'party' => 'Hay đi mấy người',
                 'area' => 'Khu vực hay ngồi',
                 'table' => 'Bàn hay ngồi',
                 'payment' => 'Cách thanh toán',

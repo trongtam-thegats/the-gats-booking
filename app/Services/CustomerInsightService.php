@@ -26,6 +26,13 @@ class CustomerInsightService
     /** Bao lau khong ghe thi coi la khach moi den lan dau, tinh bang ngay. */
     public const NGAY_KHACH_MOI = 60;
 
+    /**
+     * Ngoi lau hon nguong nay thi coi la don bi quen chua chot, khong tinh vao
+     * thoi quen ngoi lai. Quan mo toi khuya nhung mot luot khach 6 tieng gan nhu
+     * chac chan la nhan vien quen bam chot.
+     */
+    public const NGUONG_PHUT_NGOI = 360;
+
     /** Cach xep loai tinh trang khach => nhan hien thi. */
     public const TINH_TRANG = [
         'deu_dan' => 'Đều đặn',
@@ -579,6 +586,8 @@ class CustomerInsightService
             'avg' => $soLan ? $tongChi / $soLan : 0.0,
             'max' => (float) $hoaDon->max('total'),
             'guests' => (int) $hoaDon->sum('party_size'),
+            'dwell_median' => $this->trungViPhutNgoi($hoaDon),
+            'party_mode' => $this->soKhachHayDi($hoaDon),
             'first_at' => $hoaDon->min('paid_at') ? Carbon::parse($hoaDon->min('paid_at')) : null,
             'last_at' => $hoaDon->max('paid_at') ? Carbon::parse($hoaDon->max('paid_at')) : null,
             'first_ever' => $hoaDon->min('paid_at') ? Carbon::parse($hoaDon->min('paid_at')) : null,
@@ -692,8 +701,106 @@ class CustomerInsightService
             'hour' => $this->xepHang(collect($gio)->mapWithKeys(fn ($n, $h) => [sprintf('%02d:00', $h) => $n])),
             'area' => $this->xepHang($hoaDon->groupBy('area')->map->count()),
             'table' => $this->xepHang($hoaDon->groupBy('table_code')->map->count()),
+            'party' => $this->xepHang(
+                $hoaDon->filter(fn (Invoice $i) => (int) $i->party_size > 0)
+                    ->groupBy(fn (Invoice $i) => (int) $i->party_size.' người')
+                    ->map->count()
+            ),
+            'dwell' => $this->xepHang($this->demKhoangNgoi($hoaDon)),
             'payment' => $this->xepHang($hoaDon->groupBy('payment_method')->map->count()),
         ];
+    }
+
+    /**
+     * So phut khach ngoi lai, tinh tren tung hoa don: tu luc mo don den luc chot.
+     *
+     * Bo cac hoa don khong dung duoc thay vi ep ve 0 - mot loat so 0 gia se keo
+     * trung vi xuong sai (cung ly do voi ReportService::medianConfirmMinutes):
+     *   - thieu mot trong hai moc thoi gian
+     *   - chot truoc ca luc mo don (du lieu hong)
+     *   - qua NGUONG_PHUT: don bi quen chua chot, khong phai khach ngoi that
+     *
+     * @param  Collection<int, Invoice>  $hoaDon
+     * @return Collection<int, int>
+     */
+    protected function phutNgoi(Collection $hoaDon): Collection
+    {
+        return $hoaDon
+            ->filter(fn (Invoice $i) => $i->ordered_at && $i->paid_at)
+            ->map(fn (Invoice $i) => (int) $i->ordered_at->diffInMinutes($i->paid_at, false))
+            ->filter(fn (int $phut) => $phut > 0 && $phut <= self::NGUONG_PHUT_NGOI)
+            ->values();
+    }
+
+    /** Trung vi so phut ngoi lai; null neu khong co hoa don nao dung duoc. */
+    protected function trungViPhutNgoi(Collection $hoaDon): ?int
+    {
+        $phut = $this->phutNgoi($hoaDon)->sort()->values();
+
+        if ($phut->isEmpty()) {
+            return null;
+        }
+
+        $giua = intdiv($phut->count(), 2);
+
+        return $phut->count() % 2 === 1
+            ? (int) $phut[$giua]
+            : (int) round(($phut[$giua - 1] + $phut[$giua]) / 2);
+    }
+
+    /**
+     * So khach hay di cung nhat - lay theo so lan gap nhieu nhat tren tung hoa
+     * don, khong phai trung binh. Khach quen di doi thi con so can thay la "2",
+     * chu khong phai "2,4" vi mot lan ho dan ca nhom dong.
+     *
+     * Hoa quyet: neu hai so bang so lan thi lay so nho hon, vi nhom nho la thoi
+     * quen thuong xuyen hon.
+     *
+     * @param  Collection<int, Invoice>  $hoaDon
+     */
+    protected function soKhachHayDi(Collection $hoaDon): ?int
+    {
+        $dem = $hoaDon
+            ->map(fn (Invoice $i) => (int) $i->party_size)
+            ->filter(fn (int $n) => $n > 0)
+            ->countBy()
+            ->sortKeys()
+            ->sortDesc();
+
+        return $dem->isEmpty() ? null : (int) $dem->keys()->first();
+    }
+
+    /**
+     * Gom so phut ngoi thanh khoang. Ben goi (xepHang) xep theo so lan nhieu
+     * nhat truoc, giong cac dong thoi quen khac - khong phai theo thu tu thoi
+     * luong tang dan.
+     *
+     * @param  Collection<int, Invoice>  $hoaDon
+     * @return Collection<string, int>
+     */
+    protected function demKhoangNgoi(Collection $hoaDon): Collection
+    {
+        $khoang = [
+            'Dưới 1 giờ' => 0,
+            '1 – 2 giờ' => 0,
+            '2 – 3 giờ' => 0,
+            '3 – 4 giờ' => 0,
+            'Trên 4 giờ' => 0,
+        ];
+
+        foreach ($this->phutNgoi($hoaDon) as $phut) {
+            $nhan = match (true) {
+                $phut < 60 => 'Dưới 1 giờ',
+                $phut < 120 => '1 – 2 giờ',
+                $phut < 180 => '2 – 3 giờ',
+                $phut < 240 => '3 – 4 giờ',
+                default => 'Trên 4 giờ',
+            };
+
+            $khoang[$nhan]++;
+        }
+
+        return collect($khoang)->filter(fn (int $n) => $n > 0);
     }
 
     /**
