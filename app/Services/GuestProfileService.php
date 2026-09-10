@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Booking;
 use App\Models\GuestNote;
 use App\Models\PosCustomer;
+use App\Support\SoDienThoai;
 use App\Support\TenKhach;
 use Illuminate\Support\Collection;
 
@@ -37,7 +38,7 @@ class GuestProfileService
         $bookings = Booking::query()
             ->when($branchIds !== null, fn ($q) => $q->whereIn('branch_id', $branchIds ?: [0]))
             // So dien thoai luu nguyen van khach nhap, nen so sanh phan chi so.
-            ->whereRaw($this->digitsOnlyExpression().' = ?', [$digits])
+            ->whereRaw($this->soKhopVoi($digits), SoDienThoai::bienTheChiSo($digits))
             ->with(['branch.brand', 'diningTables'])
             ->orderByDesc('booking_date')
             ->orderByDesc('start_time')
@@ -96,8 +97,9 @@ class GuestProfileService
                 $q->where('customer_name', 'like', $like)
                     ->orWhere('code', 'like', $like);
 
-                if ($digits !== '') {
-                    $q->orWhereRaw($this->digitsOnlyExpression().' like ?', ['%'.$digits.'%']);
+                // Thu ca cac dang khach co the go, khong chi dang da chuan hoa.
+                foreach (SoDienThoai::bienTheChiSo($digits) as $chiSo) {
+                    $q->orWhereRaw($this->digitsOnlyExpression().' like ?', ['%'.$chiSo.'%']);
                 }
             })
             ->with(['branch', 'diningTables'])
@@ -121,6 +123,23 @@ class GuestProfileService
      * Bieu thuc SQL bo moi ky tu khong phai chu so khoi customer_phone.
      * Viet tay vi MySQL va SQLite khong co chung ham chuan hoa.
      */
+    /**
+     * Menh de khop dung mot so dien thoai, thu het cac dang khach co the go.
+     * Tra ve chuoi SQL dung kem SoDienThoai::bienTheChiSo() lam tham so.
+     */
+    protected function soKhopVoi(string $chuan, string $column = 'customer_phone'): string
+    {
+        $bienThe = SoDienThoai::bienTheChiSo($chuan);
+
+        if ($bienThe === []) {
+            return '1 = 0';
+        }
+
+        $cho = implode(', ', array_fill(0, count($bienThe), '?'));
+
+        return $this->digitsOnlyExpression($column).' IN ('.$cho.')';
+    }
+
     protected function digitsOnlyExpression(string $column = 'customer_phone'): string
     {
         $expression = $column;

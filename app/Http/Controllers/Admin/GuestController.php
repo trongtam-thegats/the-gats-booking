@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Models\GuestNote;
+use App\Services\CustomerInsightService;
 use App\Services\GuestProfileService;
 use App\Support\SoDienThoai;
 use Illuminate\Http\JsonResponse;
@@ -11,10 +12,18 @@ use Illuminate\Http\Request;
 /**
  * Tra cuu khach cho le tan: go so dien thoai la ra lich su va ghi chu,
  * xu ly duoc ngay tai cho.
+ *
+ * Tu 09/2026 trang nay ghep them chan dung tu hoa don POS - truoc do le tan
+ * phai nho sang trang Phan tich khach hang moi thay khach chi bao nhieu, hay
+ * ngoi ban nao. Rieng con so tien chi hien cho vai duoc xem phan tich, vi vai
+ * "chi xem" von khong duoc vao khu phan tich (xem App\Support\Roles).
  */
 class GuestController extends AdminController
 {
-    public function __construct(protected GuestProfileService $guests) {}
+    public function __construct(
+        protected GuestProfileService $guests,
+        protected CustomerInsightService $insight,
+    ) {}
 
     public function index(Request $request)
     {
@@ -30,12 +39,25 @@ class GuestController extends AdminController
             $phone = $results->first()['phone'];
         }
 
+        $chanDung = null;
+
         if ($phone !== '') {
             $profile = $this->guests->forPhone($phone, $branchIds, $this->brandIdFor($request, $phone));
             $results = collect();
+
+            // Ghep so lieu tu hoa don POS. Khop duoc vi ca hai nguon deu di qua
+            // App\Support\SoDienThoai::chuan() - xem CLAUDE.md.
+            $chanDung = $this->insight->chanDungTuHoaDon($profile['phone'], $branchIds);
         }
 
-        return view('admin.guests.index', compact('term', 'phone', 'results', 'profile'));
+        return view('admin.guests.index', [
+            'term' => $term,
+            'phone' => $phone,
+            'results' => $results,
+            'profile' => $profile,
+            'chanDung' => $chanDung,
+            'xemDuocTien' => $request->user()->canSeeAnalytics(),
+        ]);
     }
 
     /**

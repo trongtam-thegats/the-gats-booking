@@ -4,11 +4,13 @@ namespace App\Services;
 
 use App\Models\Branch;
 use App\Models\Invoice;
+use App\Models\InvoiceItem;
 use App\Models\PosCustomer;
 use App\Support\SoDienThoai;
 use App\Support\XlsxReader;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Generator;
 use RuntimeException;
 
 /**
@@ -82,12 +84,36 @@ class PosImportService
     ];
 
     /**
+     * Ten cot tep mat hang => cot trong bang invoice_items.
+     *
+     * Tep nay moi dong mot MON, va lap lai toan bo cot cua hoa don o moi dong.
+     * Chi lay phan mat hang; phan hoa don da nhap tu tep "danh sach hoa don".
+     *
+     * Luu y hai cap ten de lan nhau trong chinh tep nay:
+     *   "Tiền hàng" (cua dong mon) vs "Tổng tiền hàng (1)" (cua ca hoa don)
+     *   "Tổng giảm giá" (cua dong mon) vs "Tổng giảm giá (4)" (cua ca hoa don)
+     * Khop theo phan dau van phan biet duoc vi chu dau khac nhau.
+     *
+     * @var array<string, string>
+     */
+    public const COT_MAT_HANG = [
+        'Mã hóa đơn' => 'code',
+        'Mã mặt hàng' => 'sku',
+        'Tên mặt hàng, combo' => 'name',
+        'Danh mục' => 'category',
+        'Số lượng' => 'quantity',
+        'Đơn vị' => 'unit',
+        'Giá bán' => 'unit_price',
+        'Tiền hàng' => 'amount',
+    ];
+
+    /**
      * Cot co ten qua ngan, de nuot nham cot khac neu khop theo phan dau.
      * "Hoa don" (so lan ghe) khong duoc an "Hoa don gan nhat" (ma hoa don).
      *
      * @var array<int, string>
      */
-    protected const KHOP_DUNG = ['Họ', 'Tên', 'Hóa đơn', 'Email', 'Ghi chú', 'Bàn'];
+    protected const KHOP_DUNG = ['Họ', 'Tên', 'Hóa đơn', 'Email', 'Ghi chú', 'Bàn', 'Tiền hàng'];
 
     /** Cot ngay gio trong tep hoa don, luu duoi dang so cua Excel. */
     protected const NGAY_HOA_DON = ['ordered_at', 'paid_at'];
@@ -241,6 +267,207 @@ class PosImportService
      * @param  array<string, string>  $bang
      * @return array<string, string>
      */
+    /**
+     * Nhap tep "danh sach mat hang": moi dong mot mon trong mot hoa don.
+     *
+     * Phai nhap tep hoa don TRUOC. Dong nao tro toi hoa don chua co trong he
+     * thong thi bo qua va dem lai - bao lai cho nguoi dung thay vi tu tao hoa
+     * don thieu du lieu.
+     *
+     * Nhap de duoc: mon cua hoa don nao co trong tep thi xoa het roi ghi lai,
+     * nen xuat tep moi chong len tep cu khong bao gio sinh ban trung.
+     *
+     * @return array{tong: int, mon: int, hoaDon: int, khongKhop: int, boQua: int}
+     */
+    public function matHang(string $tep, Branch $branch, bool $ghi = false): array
+    {
+        $doc = new XlsxReader($tep);
+
+        // Doc theo luong chu khong goi table(): tep mat hang cua mot quan da
+        // hon 19.000 dong, nap het vao mang la het bo nho PHP (128M) ngay tren
+        // may that. Da dinh mot lan roi.
+        $viTri = $this->viTriCotMatHang($doc);
+
+        if ($viTri === []) {
+            throw new RuntimeException(
+                'Không tìm thấy cột "Tên mặt hàng, combo". Tệp này có phải danh sách mặt hàng không? '
+                .'Tệp danh sách hóa đơn chỉ có một dòng cho mỗi hóa đơn.'
+            );
+        }
+
+        $thieu = array_diff(['code', 'name'], array_keys($viTri));
+
+        if ($thieu) {
+            throw new RuntimeException('Tệp thiếu cột bắt buộc: '.implode(', ', $thieu));
+        }
+
+        $idTheoMa = Invoice::where('branch_id', $branch->id)->pluck('id', 'code');
+        $ketQua = ['tong' => 0, 'mon' => 0, 'hoaDon' => 0, 'khongKhop' => 0, 'boQua' => 0];
+        $idDungToi = [];
+
+        // Luot 1: dem, va gom cac hoa don co trong tep.
+        foreach ($this->dongMatHang($doc, $viTri) as $o) {
+            $ketQua['tong']++;
+
+            if ($o['code'] === '' || $o['name'] === '') {
+                $ketQua['boQua']++;
+
+                continue;
+            }
+
+            if (! isset($idTheoMa[$o['code']])) {
+                $ketQua['khongKhop']++;
+
+                continue;
+            }
+
+            $ketQua['mon']++;
+            $idDungToi[$idTheoMa[$o['code']]] = true;
+        }
+
+        $ketQua['hoaDon'] = count($idDungToi);
+
+        if (! $ghi || $idDungToi === []) {
+            return $ketQua;
+        }
+
+        // Luot 2: xoa mon cu cua dung nhung hoa don nay roi ghi lai. Lam hai
+        // luot de khong phu thuoc vao viec tep co xep cac dong cua cung mot
+        // hoa don lien nhau hay khong.
+        DB::transaction(function () use ($doc, $viTri, $idTheoMa, $idDungToi) {
+            foreach (array_chunk(array_keys($idDungToi), 500) as $lo) {
+                InvoiceItem::whereIn('invoice_id', $lo)->delete();
+            }
+
+            $dem = [];
+            $luc = now();
+
+            foreach ($this->dongMatHang($doc, $viTri) as $o) {
+                if ($o['code'] === '' || $o['name'] === '' || ! isset($idTheoMa[$o['code']])) {
+                    continue;
+                }
+
+                $dem[] = [
+                    'invoice_id' => $idTheoMa[$o['code']],
+                    'sku' => $this->chuoi($o['sku'], 60),
+                    'name' => mb_substr($o['name'], 0, 255),
+                    'category' => $this->chuoi($o['category'], 80),
+                    'quantity' => $this->soThuc($o['quantity']),
+                    'unit' => $this->chuoi($o['unit'], 30),
+                    'unit_price' => $this->soThuc($o['unit_price']),
+                    'amount' => $this->soThuc($o['amount']),
+                    'created_at' => $luc,
+                    'updated_at' => $luc,
+                ];
+
+                if (count($dem) >= 500) {
+                    InvoiceItem::insert($dem);
+                    $dem = [];
+                }
+            }
+
+            if ($dem) {
+                InvoiceItem::insert($dem);
+            }
+        });
+
+        return $ketQua;
+    }
+
+    /**
+     * Tim vi tri cac cot can dung trong tep mat hang: ten cot => chi so cot.
+     *
+     * @return array<string, int>
+     */
+    protected function viTriCotMatHang(XlsxReader $doc): array
+    {
+        foreach ($doc->rows() as $row) {
+            $chu = array_map(fn ($x) => $doc->gonChu((string) $x), $row);
+
+            if (! in_array('Mã hóa đơn', $chu, true) || ! in_array('Tên mặt hàng, combo', $chu, true)) {
+                continue;
+            }
+
+            $viTri = [];
+
+            foreach ($chu as $i => $ten) {
+                if ($ten === '') {
+                    continue;
+                }
+
+                foreach (self::COT_MAT_HANG as $dau => $cot) {
+                    if (isset($viTri[$cot])) {
+                        continue;
+                    }
+
+                    $khop = in_array($dau, self::KHOP_DUNG, true)
+                        ? $ten === $dau || str_starts_with($ten, $dau.' (')
+                        : str_starts_with($ten, $dau);
+
+                    if ($khop) {
+                        $viTri[$cot] = $i;
+                        break;
+                    }
+                }
+            }
+
+            return $viTri;
+        }
+
+        return [];
+    }
+
+    /**
+     * Doc tung dong mat hang sau dong tieu de, tra ve mang da anh xa san.
+     *
+     * @param  array<string, int>  $viTri
+     * @return Generator<int, array<string, string>>
+     */
+    protected function dongMatHang(XlsxReader $doc, array $viTri): Generator
+    {
+        $quaTieuDe = false;
+
+        foreach ($doc->rows() as $row) {
+            if (! $quaTieuDe) {
+                $chu = array_map(fn ($x) => $doc->gonChu((string) $x), $row);
+                $quaTieuDe = in_array('Mã hóa đơn', $chu, true)
+                    && in_array('Tên mặt hàng, combo', $chu, true);
+
+                continue;
+            }
+
+            $o = [];
+
+            foreach (self::COT_MAT_HANG as $cot) {
+                $o[$cot] = isset($viTri[$cot]) ? trim((string) ($row[$viTri[$cot]] ?? '')) : '';
+            }
+
+            if ($o['code'] === '' && $o['name'] === '') {
+                continue;
+            }
+
+            yield $o;
+        }
+    }
+
+    /** Cat chuoi cho vua cot, tra ve null neu rong. */
+    protected function chuoi(mixed $o, int $dai): ?string
+    {
+        $chu = trim((string) ($o ?? ''));
+
+        return $chu === '' ? null : mb_substr($chu, 0, $dai);
+    }
+
+    /** Doc so tu o Excel; o rong hoac khong phai so thi ve 0. */
+    protected function soThuc(mixed $o): float
+    {
+        if ($o === null || $o === '') {
+            return 0.0;
+        }
+
+        return (float) preg_replace('/[^0-9.\-]/', '', (string) $o);
+    }
+
     protected function anhXaCot(array $tieuDe, array $bang): array
     {
         $anhXa = [];

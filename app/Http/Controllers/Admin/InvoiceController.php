@@ -79,8 +79,8 @@ class InvoiceController extends AdminController
 
         $data = $request->validate([
             'tep' => ['required', 'file', 'mimes:xlsx', 'max:20480'],
-            'loai' => ['required', 'in:hoa-don,khach-hang'],
-            'branch_id' => ['required_if:loai,hoa-don', 'nullable', 'integer', 'exists:branches,id'],
+            'loai' => ['required', 'in:hoa-don,mat-hang,khach-hang'],
+            'branch_id' => ['required_if:loai,hoa-don', 'required_if:loai,mat-hang', 'nullable', 'integer', 'exists:branches,id'],
         ], [], [
             'tep' => 'tệp',
             'loai' => 'loại dữ liệu',
@@ -99,6 +99,22 @@ class InvoiceController extends AdminController
 
                 $loi = 'Đã nhập hóa đơn cho '.$branch->name.': '.$k['moi'].' hóa đơn mới, '
                     .$k['capNhat'].' cập nhật lại, '.$k['coSdt'].' có số điện thoại.';
+            } elseif ($data['loai'] === 'mat-hang') {
+                $branch = $this->accessibleBranches($request)->firstWhere('id', (int) $data['branch_id']);
+
+                abort_unless($branch, 403, 'Địa điểm này không thuộc quyền của bạn.');
+
+                $k = $nhap->matHang($duongDan, $branch, true);
+
+                $loi = 'Đã nhập mặt hàng cho '.$branch->name.': '.number_format($k['mon'])
+                    .' dòng món thuộc '.number_format($k['hoaDon']).' hóa đơn.';
+
+                // Noi ro thay vi im lang: dong khong khop nghia la hoa don do
+                // chua duoc nhap, nguoi dung can tai tep hoa don truoc.
+                if ($k['khongKhop'] > 0) {
+                    $loi .= ' Bỏ qua '.number_format($k['khongKhop'])
+                        .' dòng vì chưa có hóa đơn tương ứng — hãy nhập tệp danh sách hóa đơn trước rồi nhập lại tệp này.';
+                }
             } else {
                 $k = $nhap->khachHang($duongDan, null, true);
 

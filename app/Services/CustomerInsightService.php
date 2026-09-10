@@ -6,6 +6,7 @@ use App\Models\Booking;
 use App\Models\Branch;
 use App\Models\GuestNote;
 use App\Models\Invoice;
+use App\Models\InvoiceItem;
 use App\Models\PosCustomer;
 use App\Support\TenKhach;
 use Illuminate\Support\Carbon;
@@ -348,6 +349,43 @@ class CustomerInsightService
      * @param  array<int>|null  $branchIds
      * @return array<string, mixed>|null
      */
+    /**
+     * Phan chan dung suy ra tu hoa don, khong kem lich su dat ban.
+     *
+     * Dung cho trang Tra cuu khach - trang do da tu truy van dat ban roi, goi
+     * profile() day du se lam lai truy van do lan hai.
+     *
+     * @param  array<int, int>|null  $branchIds
+     * @return array{stats: array<string, mixed>, habits: array<string, mixed>, invoices: Collection<int, Invoice>}|null
+     */
+    public function chanDungTuHoaDon(string $phone, ?array $branchIds): ?array
+    {
+        $hoaDon = Invoice::query()
+            ->choDiaDiem($branchIds)
+            ->where('customer_phone', $phone)
+            ->orderByDesc('paid_at')
+            ->get();
+
+        if ($hoaDon->isEmpty()) {
+            return null;
+        }
+
+        $dung = $hoaDon->reject(fn (Invoice $i) => $i->daHuy());
+
+        if ($dung->isEmpty()) {
+            return null;
+        }
+
+        $co = $this->chiSoHoaDon($dung, $phone, $hoaDon->firstWhere('customer_name', '!=', null)?->customer_name);
+        $co += $this->nhipGhe($co);
+
+        return [
+            'stats' => $co,
+            'habits' => $this->thoiQuen($dung),
+            'invoices' => $hoaDon,
+        ];
+    }
+
     public function profile(string $phone, ?array $branchIds): ?array
     {
         $hoaDon = Invoice::query()
@@ -708,6 +746,43 @@ class CustomerInsightService
             ),
             'dwell' => $this->xepHang($this->demKhoangNgoi($hoaDon)),
             'payment' => $this->xepHang($hoaDon->groupBy('payment_method')->map->count()),
+        ] + $this->monHayGoi($hoaDon);
+    }
+
+    /**
+     * Mon va danh muc khach hay goi, tinh theo SO LY chu khong theo so lan.
+     *
+     * Mot dem khach goi 4 ly Old Fashioned dang gia hon 4 dem moi dem mot ly
+     * nuoc suoi. Tra ve mang rong neu quan chua nhap tep mat hang - luc do
+     * giao dien khong hien hai dong nay.
+     *
+     * @param  Collection<int, Invoice>  $hoaDon
+     * @return array<string, array<int, array{label: string, count: int, share: float}>>
+     */
+    protected function monHayGoi(Collection $hoaDon): array
+    {
+        $id = $hoaDon->pluck('id')->filter()->all();
+
+        if ($id === []) {
+            return [];
+        }
+
+        $mon = InvoiceItem::query()
+            ->whereIn('invoice_id', $id)
+            ->get(['name', 'category', 'quantity']);
+
+        if ($mon->isEmpty()) {
+            return [];
+        }
+
+        $theoTen = $mon->groupBy('name')->map(fn ($nhom) => (int) round($nhom->sum('quantity')));
+        $theoDanhMuc = $mon->filter(fn (InvoiceItem $m) => trim((string) $m->category) !== '')
+            ->groupBy('category')
+            ->map(fn ($nhom) => (int) round($nhom->sum('quantity')));
+
+        return [
+            'mon' => $this->xepHang($theoTen),
+            'danh_muc' => $this->xepHang($theoDanhMuc),
         ];
     }
 

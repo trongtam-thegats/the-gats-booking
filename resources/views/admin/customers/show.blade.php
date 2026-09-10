@@ -10,6 +10,7 @@
     $co = $ho['stats'];
     $the = $ho['card'];
     $dat = $ho['booking_stats'];
+    $phut = $co['dwell_median'];
 
     $mauTinhTrang = [
         'deu_dan' => 'status-confirmed',
@@ -99,7 +100,6 @@
         </div>
         <div class="stat">
             <span>Thường ngồi</span>
-            @php($phut = $co['dwell_median'])
             <b>
                 @if ($phut === null)
                     —
@@ -116,15 +116,28 @@
             <b>{{ $co['party_mode'] ?? '—' }}<small>{{ $co['party_mode'] ? ' người' : '' }}</small></b>
             <small class="muted">tổng {{ number_format($co['guests']) }} lượt khách</small>
         </div>
+        @php
+            $canChamSocO = $co['visits'] >= 2 && $ho['trang_thai'] === 'nguy_co';
+            $moDuocXemXet = auth()->user()->canWrite() && ($canChamSocO || $ghiChu?->reviewed_at);
+        @endphp
         <div class="stat">
             <span>Xem xét</span>
             <b style="font-size:19px">
-                <span class="pill {{ $mauXemXet[$ho['review']] }}">{{ Insight::XEM_XET[$ho['review']] }}</span>
+                @if ($moDuocXemXet)
+                    {{-- Bam vao o la nhay xuong khoi danh dau va mo no ra. --}}
+                    <a href="#xem-xet" onclick="document.getElementById('xem-xet').open = true">
+                        <span class="pill {{ $mauXemXet[$ho['review']] }}">{{ Insight::XEM_XET[$ho['review']] }}</span>
+                    </a>
+                @else
+                    <span class="pill {{ $mauXemXet[$ho['review']] }}">{{ Insight::XEM_XET[$ho['review']] }}</span>
+                @endif
             </b>
             <small class="muted">
                 @if ($ghiChu?->reviewed_at)
                     {{ $ghiChu->reviewed_at->format('d/m/Y') }}
                     @if ($ghiChu->reviewedBy) · {{ $ghiChu->reviewedBy->name }} @endif
+                @elseif ($moDuocXemXet)
+                    bấm để đánh dấu
                 @else
                     chưa ai xem xét
                 @endif
@@ -145,9 +158,32 @@
         </div>
     </div>
 
-    @if (auth()->user()->canWrite())
-        <div class="card">
-            <h2>Đánh dấu đã xem xét</h2>
+    {{-- Khoi danh dau chi hien khi thuc su can, cho gon trang.
+         Dieu kien "can cham soc" dung y het bo loc 'risk' o danh sach khach
+         (CustomerInsightService::ranking) - de hai cho khong bao gio lech nhau. --}}
+    @php
+        $canChamSoc = $co['visits'] >= 2 && $ho['trang_thai'] === 'nguy_co';
+        $daDanhDau = (bool) $ghiChu?->reviewed_at;
+        $hienXemXet = auth()->user()->canWrite() && ($canChamSoc || $daDanhDau);
+    @endphp
+
+    @if ($hienXemXet)
+        {{-- Mo san khi khach dang can goi ma chua ai danh dau; con lai thi gap
+             lai, bam vao o "Xem xét" phia tren la mo ra. --}}
+        <details class="card" id="xem-xet" @if ($canChamSoc && ! $daDanhDau) open @endif>
+            <summary>
+                <b>Đánh dấu đã xem xét</b>
+                @if ($daDanhDau)
+                    <span class="pill {{ $mauXemXet[$ho['review']] }}">{{ Insight::XEM_XET[$ho['review']] }}</span>
+                    <span class="muted small">
+                        {{ $ghiChu->reviewed_at->format('d/m/Y') }}
+                        @if ($ghiChu->reviewedBy) · {{ $ghiChu->reviewedBy->name }} @endif
+                    </span>
+                @else
+                    <span class="pill status-pending">Chưa xem xét</span>
+                @endif
+            </summary>
+
             <p class="muted small">
                 Đánh dấu để khách này không hiện lại trong danh sách cần chăm sóc.
                 <b>Khách ghé lại lần nữa thì hệ thống tự chuyển sang “Đã ghé lại”</b> — không ai phải vào gỡ tay.
@@ -188,7 +224,7 @@
                     <button class="btn btn-ghost btn-sm" type="submit">Bỏ đánh dấu</button>
                 </form>
             @endif
-        </div>
+        </details>
     @endif
 
     <div class="card">
@@ -197,6 +233,8 @@
 
         <div class="form-grid">
             @foreach ([
+                'mon' => 'Món hay gọi',
+                'danh_muc' => 'Nhóm đồ hay uống',
                 'weekday' => 'Hay ghé thứ mấy',
                 'hour' => 'Khung giờ thanh toán',
                 'dwell' => 'Thường ngồi bao lâu',

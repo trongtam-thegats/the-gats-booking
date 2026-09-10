@@ -78,12 +78,22 @@ ngoài giữ `+ma`. Ba nguồn dữ liệu (đặt bàn, hoá đơn POS, thẻ k
 - Không xóa được unique index đang gắn khóa ngoại — tạo index mới trước rồi mới xóa cái cũ.
 - `@json([...])` với mảng nhiều dòng lồng ngoặc làm Blade lỗi phân tích cú pháp — gom mảng trong khối
   `@php` trước rồi `@json($bien)`.
+- Dạng nội dòng `@php($bien = ...)` có lúc biên dịch hỏng thành `<?php($bien = ...)` **thiếu thẻ đóng**:
+  từ chỗ đó trở đi Blade coi cả tệp là PHP thô, mọi `{{ }}` và `@if` phía sau thành chữ, trang trả 500.
+  Không có lỗi cú pháp nào báo ra, `php -l` cũng sạch. Khai biến trong khối `@php ... @endphp` ở đầu
+  tệp thay vì dùng dạng nội dòng. Đã dính ở `admin/customers/show.blade.php`.
 - `Request::create()` của Laravel tự gửi `Accept-Language: en-us,en` nên test trang khách sẽ ra tiếng
   Anh; `tests/TestCase.php` đã ghim `vi`.
 - Route model binding của `Brand` và `Branch` dùng **slug**, không phải id.
 - Tệp POS có cặp cột lồng nhau: `Hóa đơn` (số lần ghé) và `Hóa đơn gần nhất` (mã hoá đơn). Khớp tên
   theo phần đầu sẽ nuốt nhầm — xem hằng `KHOP_DUNG` trong `PosImportService`.
 - Ngày trong tệp `.xlsx` là **số serial của Excel**, phải đổi qua `XlsxReader::ngay()`.
+- `XlsxReader::table()` nạp **toàn bộ** dòng vào mảng — tệp mặt hàng một quán đã hơn 19.000 dòng, gọi
+  `table()` là hết bộ nhớ PHP ngay. `PosImportService::matHang()` vì thế đọc theo luồng qua `rows()`,
+  hai lượt: lượt một đếm và gom mã hóa đơn, lượt hai chèn theo lô 500. Đỉnh bộ nhớ ~80 MB.
+- `bookings.customer_phone` lưu **nguyên văn khách gõ**, còn `SoDienThoai::chuan()` giữ dấu `+` cho số
+  nước ngoài. So thẳng chuỗi đã chuẩn hóa với cột đã bóc dấu `+` thì **không bao giờ khớp** — 133 đơn
+  của khách nước ngoài từng tra không ra. Dùng `SoDienThoai::bienTheChiSo()` để sinh các dạng cần thử.
 
 ## Nhập dữ liệu cũ
 
@@ -97,6 +107,16 @@ php artisan pos:nhap-khach-hang tep.xlsx [--ghi]
 
 Quản trị viên cũng tải tệp `.xlsx` lên được ở cuối trang *Hóa đơn*, dùng chung `PosImportService` với
 lệnh artisan.
+
+**Ba loại tệp POS, đừng lẫn:** *danh sách hóa đơn* (mỗi dòng một hóa đơn → bảng `invoices`),
+*danh sách mặt hàng* (mỗi dòng một **món** → bảng `invoice_items`), *danh sách khách hàng* (thẻ, điểm
+→ `pos_customers`). Tệp mặt hàng phải nhập **sau** tệp hóa đơn: dòng nào trỏ tới hóa đơn chưa có thì
+bị bỏ qua và đếm lại, báo rõ ra màn hình chứ không tự tạo hóa đơn thiếu dữ liệu.
+
+Tệp mặt hàng **lặp lại toàn bộ cột của hóa đơn ở mỗi dòng**, nên có hai cặp tên dễ lẫn:
+`Tiền hàng` (của món) với `Tổng tiền hàng (1)` (của cả hóa đơn), và `Tổng giảm giá` hai cấp tương tự.
+`Tiền hàng` vì thế nằm trong hằng `KHOP_DUNG` — khớp đúng tên chứ không khớp theo phần đầu.
+`tests/fixtures/mat-hang-mau.xlsx` cố ý để số tiền của món khác số tiền của hóa đơn để bắt lỗi này.
 
 `dining_tables.aliases` giữ **tên cũ** của bàn (`Bar 1` ← `B1,B01`) để tệp xuất từ hệ thống cũ vẫn tra
 được sau khi quán đổi tên bàn.

@@ -88,6 +88,102 @@
             </div>
         @endif
 
+        {{-- Chan dung suy ra tu hoa don POS. Khop theo so dien thoai da chuan hoa. --}}
+        @if ($chanDung)
+            @php($cd = $chanDung['stats'])
+            @php($phutNgoi = $cd['dwell_median'])
+
+            <div class="card">
+                <h2>Chân dung từ hóa đơn</h2>
+                <p class="muted small">
+                    Tính trên {{ $cd['visits'] }} hóa đơn đã thanh toán, khớp theo số điện thoại.
+                    @if (! $xemDuocTien)
+                        Số tiền chỉ hiện với vai quản lý trở lên.
+                    @endif
+                </p>
+
+                <div class="stats">
+                    <div class="stat">
+                        <span>Số lần đã ghé</span>
+                        <b>{{ $cd['visits'] }}</b>
+                        <small class="muted">
+                            {{ $cd['last_at'] ? 'gần nhất '.$cd['last_at']->format('d/m/Y') : '' }}
+                        </small>
+                    </div>
+
+                    @if ($xemDuocTien)
+                        <div class="stat accent">
+                            <span>Chi trung bình</span>
+                            <b>{{ number_format($cd['avg']) }}<small>đ</small></b>
+                            <small class="muted">cao nhất {{ number_format($cd['max']) }}đ</small>
+                        </div>
+                    @endif
+
+                    <div class="stat">
+                        <span>Thường ngồi</span>
+                        <b>
+                            @if ($phutNgoi === null)
+                                —
+                            @elseif ($phutNgoi >= 60)
+                                {{ intdiv($phutNgoi, 60) }}<small>g</small>{{ $phutNgoi % 60 ? sprintf('%02d', $phutNgoi % 60) : '' }}
+                            @else
+                                {{ $phutNgoi }}<small> phút</small>
+                            @endif
+                        </b>
+                        <small class="muted">{{ $phutNgoi === null ? 'chưa đủ dữ liệu' : 'trung vị mỗi lần' }}</small>
+                    </div>
+
+                    <div class="stat">
+                        <span>Hay đi mấy người</span>
+                        <b>{{ $cd['party_mode'] ?? '—' }}<small>{{ $cd['party_mode'] ? ' người' : '' }}</small></b>
+                        <small class="muted">nhịp ghé {{ $cd['cadence'] === null ? '—' : $cd['cadence'].' ngày' }}</small>
+                    </div>
+                </div>
+
+                <div class="form-grid" style="margin-top:16px">
+                    @foreach ([
+                        'mon' => 'Món hay gọi',
+                        'danh_muc' => 'Nhóm đồ hay uống',
+                        'table' => 'Bàn hay ngồi',
+                        'area' => 'Khu vực hay ngồi',
+                        'dwell' => 'Thường ngồi bao lâu',
+                        'party' => 'Hay đi mấy người',
+                        'weekday' => 'Hay ghé thứ mấy',
+                        'hour' => 'Khung giờ thanh toán',
+                    ] as $khoa => $nhan)
+                        @if (! empty($chanDung['habits'][$khoa]))
+                            <div class="field">
+                                <label>{{ $nhan }}</label>
+                                <div class="table-wrap">
+                                    <table>
+                                        <tbody>
+                                        @foreach ($chanDung['habits'][$khoa] as $dong)
+                                            <tr>
+                                                <td class="small">{{ $dong['label'] }}</td>
+                                                <td class="num small muted">{{ $dong['count'] }} lần · {{ $dong['share'] }}%</td>
+                                            </tr>
+                                        @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        @endif
+                    @endforeach
+                </div>
+
+                @if ($xemDuocTien)
+                    <p class="hint">
+                        <a href="{{ route('admin.customers.show', $profile['phone']) }}">Xem hồ sơ phân tích đầy đủ →</a>
+                    </p>
+                @endif
+            </div>
+        @else
+            <p class="hint">
+                Chưa có hóa đơn nào khớp số điện thoại này. Hóa đơn được nhập ở trang
+                <b>Hóa đơn</b>, và chỉ khoảng một phần tư hóa đơn có ghi số điện thoại khách.
+            </p>
+        @endif
+
         <div class="grid-2">
             <div class="card">
                 <h2>Ghi chú của quán</h2>

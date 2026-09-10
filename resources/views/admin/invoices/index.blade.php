@@ -165,6 +165,7 @@
                     <label for="loai">Loại dữ liệu</label>
                     <select id="loai" name="loai">
                         <option value="hoa-don">Danh sách hóa đơn</option>
+                        <option value="mat-hang">Danh sách mặt hàng (mỗi dòng một món)</option>
                         <option value="khach-hang">Danh sách khách hàng (thẻ, điểm, sinh nhật)</option>
                     </select>
                 </div>
