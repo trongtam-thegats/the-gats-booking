@@ -4,7 +4,10 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>@yield('title', 'Quản lý') · The Gats Booking</title>
-    <link rel="stylesheet" href="{{ asset('css/admin.css') }}">
+    {{-- Assets::url kem dau thoi gian sua doi. Truoc day cho nay goi asset()
+         tran nen trinh duyet giu mai ban CSS cu - doi giao dien xong ma nhan
+         vien van thay ban cu. --}}
+    <link rel="stylesheet" href="{{ \App\Support\Assets::url('css/admin.css') }}">
 </head>
 <body>
 @php($user = auth()->user())

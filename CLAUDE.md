@@ -10,6 +10,10 @@ tiếng Việt. Đây là quy ước của dự án, không phải nhầm lẫn 
 
 - **Hosting chỉ chạy PHP.** Không Node, không bước build, không npm. Front-end là Blade + JS thuần,
   CSS viết tay trong `public/css/`. Đừng đề xuất Vite, Tailwind, React, hay thư viện biểu đồ ngoài.
+- **Khu quản trị dùng nền SÁNG, trang khách vẫn nền TỐI.** Hai file CSS tách bạch: `admin.css` (sáng)
+  và `site.css` (tối, là bộ mặt với khách — đừng đổi theo). Mọi màu trong `admin.css` đi qua biến ở
+  khối `:root`, **không còn mã màu cứng nào**; đổi tông chỉ cần sửa khối đó. File dùng `color-mix()`
+  và `:has()` — cần trình duyệt từ 2023 trở đi, vốn không thành vấn đề với máy nhân viên.
 - **Không thêm gói Composer nếu tránh được.** Ví dụ: đọc `.xlsx` bằng `App\Support\XlsxReader`
   (ZipArchive + SimpleXML có sẵn) thay vì PhpSpreadsheet. Đó là lựa chọn có chủ ý.
 - **Mọi tính toán ngày tháng làm trong PHP**, không dùng hàm ngày tháng của MySQL, để chạy được trên

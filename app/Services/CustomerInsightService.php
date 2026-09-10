@@ -396,7 +396,9 @@ class CustomerInsightService
 
         $don = Booking::query()
             ->when($branchIds !== null, fn ($q) => $q->whereIn('branch_id', $branchIds ?: [0]))
-            ->where('customer_phone', $phone)
+            // Cot nay luu nguyen van khach go nen phai so theo chu so - xem
+            // Booking::scopeCuaSoDienThoai().
+            ->cuaSoDienThoai($phone)
             ->with('diningTables:id,code')
             ->orderByDesc('booking_date')
             ->get();

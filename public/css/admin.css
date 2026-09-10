@@ -1,19 +1,37 @@
 /* Khu quan tri - The Gats Booking */
 
 :root {
-    --bg: #0f0e0d;
-    --panel: #1a1816;
-    --panel-2: #211e1b;
-    --line: #2f2a25;
-    --line-soft: #262220;
-    --gold: #c8a15a;
-    --gold-soft: #e0c48c;
-    --text: #efeae3;
-    --muted: #9b9188;
-    --danger: #e0685f;
-    --ok: #6fbf7a;
-    --info: #78aae6;
+    /* Nen sang. Giu vang dong lam mau nhan dien, nhung dam hon ban cu vi
+       vang nhat (#c8a15a) doc khong ra tren nen trang. */
+    --bg: #f4f5f7;          /* nen trang */
+    --panel: #ffffff;       /* the */
+    --panel-2: #f7f8fa;     /* o long trong the */
+    --side-bg: #ffffff;     /* cot dieu huong */
+    --hover: #f1f3f6;       /* di chuot qua dong bang, muc menu */
+    --line: #e3e6ea;
+    --line-soft: #eef0f3;
+    --track: #e8ebef;       /* thanh nen cua bieu do ngang */
+
+    --text: #1c2430;
+    --muted: #6b7684;
+    --faint: #98a2b0;       /* chu mo nhat: ghi chu chan cot */
+
+    --gold: #b07d2c;
+    --gold-soft: #8a6220;   /* mau chu lien ket - phai du dam tren nen trang */
+    --on-gold: #ffffff;     /* chu tren nut vang */
+
+    --danger: #c9372c;
+    --ok: #1f7a45;
+    --info: #2f6fb5;
+
+    /* Nen nhat cua nhan trang thai va hop canh bao */
+    --ok-bg: #e7f4ec;
+    --danger-bg: #fdeceb;
+    --info-bg: #e9f1fb;
+    --neutral-bg: #eef0f3;
+
     --radius: 12px;
+    --shadow: 0 1px 2px rgba(16, 24, 40, .05), 0 1px 3px rgba(16, 24, 40, .06);
 }
 
 * { box-sizing: border-box; }
@@ -36,7 +54,7 @@ a { color: var(--gold-soft); }
 .side {
     width: 232px;
     flex: 0 0 232px;
-    background: #141210;
+    background: var(--side-bg);
     border-right: 1px solid var(--line);
     padding: 20px 14px;
     display: flex;
@@ -76,14 +94,14 @@ a { color: var(--gold-soft); }
     transition: .13s;
 }
 
-.nav-link:hover { background: #1e1b18; color: var(--text); }
-.nav-link.active { background: rgba(200, 161, 90, .14); color: var(--gold-soft); font-weight: 600; }
+.nav-link:hover { background: var(--hover); color: var(--text); }
+.nav-link.active { background: color-mix(in srgb, var(--gold) 12%, transparent); color: var(--gold-soft); font-weight: 600; }
 
 .nav-group {
     font-size: 11px;
     letter-spacing: .16em;
     text-transform: uppercase;
-    color: #6b6259;
+    color: var(--faint);
     padding: 16px 12px 6px;
 }
 
@@ -113,6 +131,7 @@ a { color: var(--gold-soft); }
     border: 1px solid var(--line);
     border-radius: var(--radius);
     padding: 18px;
+    box-shadow: var(--shadow);
 }
 
 .card + .card { margin-top: 16px; }
@@ -134,6 +153,7 @@ a { color: var(--gold-soft); }
     border: 1px solid var(--line);
     border-radius: var(--radius);
     padding: 14px 16px;
+    box-shadow: var(--shadow);
 }
 
 .stat b { display: block; font-size: 26px; font-weight: 600; line-height: 1.2; }
@@ -161,7 +181,7 @@ th {
 
 td { padding: 11px 10px; border-bottom: 1px solid var(--line-soft); vertical-align: top; }
 
-tbody tr:hover { background: #1e1b18; }
+tbody tr:hover { background: var(--hover); }
 
 td.num, th.num { text-align: right; }
 
@@ -182,7 +202,7 @@ label { font-size: 12.5px; color: var(--muted); }
 
 input[type=text], input[type=tel], input[type=email], input[type=date],
 input[type=time], input[type=number], input[type=password], select, textarea {
-    background: #141210;
+    background: var(--side-bg);
     border: 1px solid var(--line);
     color: var(--text);
     border-radius: 8px;
@@ -195,7 +215,7 @@ input[type=time], input[type=number], input[type=password], select, textarea {
 input:focus, select:focus, textarea:focus {
     outline: none;
     border-color: var(--gold);
-    box-shadow: 0 0 0 3px rgba(200, 161, 90, .14);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 12%, transparent);
 }
 
 textarea { resize: vertical; min-height: 70px; }
@@ -205,12 +225,18 @@ textarea { resize: vertical; min-height: 70px; }
 
 .hint { font-size: 12px; color: var(--muted); }
 
+/* O form la flex doc, nen nut dat trong do bi keo dan het chieu ngang - nut
+   "Loc" tung thanh mot thanh vang vat ngang ca trang. Nut phai co be theo chu,
+   va o nao chua nut thi xep hang ngang. */
+.field > .btn { align-self: flex-start; }
+.field:has(> .btn) { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 8px; }
+
 .btn {
     display: inline-flex;
     align-items: center;
     gap: 6px;
     background: var(--gold);
-    color: #17130d;
+    color: var(--on-gold);
     border: 1px solid var(--gold);
     border-radius: 8px;
     padding: 8px 16px;
@@ -226,13 +252,13 @@ textarea { resize: vertical; min-height: 70px; }
 .btn-sm { padding: 5px 11px; font-size: 13px; }
 
 .btn-ghost { background: transparent; color: var(--gold-soft); border-color: var(--line); font-weight: 500; }
-.btn-ghost:hover { background: #221e1a; border-color: var(--gold); }
+.btn-ghost:hover { background: var(--hover); border-color: var(--gold); }
 
-.btn-danger { background: transparent; color: var(--danger); border-color: rgba(224, 104, 95, .4); font-weight: 500; }
-.btn-danger:hover { background: rgba(224, 104, 95, .12); }
+.btn-danger { background: transparent; color: var(--danger); border-color: color-mix(in srgb, var(--danger) 40%, transparent); font-weight: 500; }
+.btn-danger:hover { background: color-mix(in srgb, var(--danger) 12%, transparent); }
 
-.btn-ok { background: transparent; color: #8fd39a; border-color: rgba(111, 191, 122, .4); font-weight: 500; }
-.btn-ok:hover { background: rgba(111, 191, 122, .12); }
+.btn-ok { background: transparent; color: var(--ok); border-color: color-mix(in srgb, var(--ok) 40%, transparent); font-weight: 500; }
+.btn-ok:hover { background: color-mix(in srgb, var(--ok) 12%, transparent); }
 
 /* --- Loc --- */
 
@@ -257,11 +283,11 @@ textarea { resize: vertical; min-height: 70px; }
     white-space: nowrap;
 }
 
-.status-pending { background: rgba(200, 161, 90, .16); color: var(--gold-soft); }
-.status-confirmed { background: rgba(111, 191, 122, .16); color: #a5dcad; }
-.status-seated { background: rgba(120, 170, 230, .16); color: #a8c8ee; }
-.status-completed { background: rgba(160, 160, 160, .14); color: #c2bcb4; }
-.status-cancelled, .status-no_show { background: rgba(224, 104, 95, .14); color: #f0a9a3; }
+.status-pending { background: color-mix(in srgb, var(--gold) 14%, transparent); color: var(--gold-soft); }
+.status-confirmed { background: var(--ok-bg); color: var(--ok); }
+.status-seated { background: var(--info-bg); color: var(--info); }
+.status-completed { background: var(--neutral-bg); color: var(--muted); }
+.status-cancelled, .status-no_show { background: var(--danger-bg); color: var(--danger); }
 
 /* --- So do ban --- */
 
@@ -308,11 +334,11 @@ table.floor td.table-cell span { display: block; color: var(--muted); font-size:
     vertical-align: middle;
 }
 
-.cell.free { background: #16221a33; }
+.cell.free { background: var(--ok-bg); }
 
 .cell.busy {
-    background: rgba(200, 161, 90, .22);
-    border-left-color: rgba(200, 161, 90, .3);
+    background: color-mix(in srgb, var(--gold) 20%, transparent);
+    border-left-color: color-mix(in srgb, var(--gold) 30%, transparent);
 }
 
 .cell.busy a {
@@ -327,10 +353,10 @@ table.floor td.table-cell span { display: block; color: var(--muted); font-size:
     white-space: nowrap;
 }
 
-.cell.busy.is-seated { background: rgba(120, 170, 230, .22); }
-.cell.busy.is-seated a { color: #a8c8ee; }
+.cell.busy.is-seated { background: color-mix(in srgb, var(--info) 20%, transparent); }
+.cell.busy.is-seated a { color: var(--info); }
 
-.cell.busy.is-pending { background: rgba(200, 161, 90, .12); }
+.cell.busy.is-pending { background: color-mix(in srgb, var(--gold) 10%, transparent); }
 
 /* --- Thong bao --- */
 
@@ -342,9 +368,9 @@ table.floor td.table-cell span { display: block; color: var(--muted); font-size:
     border: 1px solid;
 }
 
-.alert-ok { background: rgba(111, 191, 122, .1); border-color: rgba(111, 191, 122, .4); color: #a5dcad; }
-.alert-error { background: rgba(224, 104, 95, .1); border-color: rgba(224, 104, 95, .45); color: #f0a9a3; }
-.alert-info { background: rgba(200, 161, 90, .08); border-color: rgba(200, 161, 90, .35); color: var(--gold-soft); }
+.alert-ok { background: var(--ok-bg); border-color: color-mix(in srgb, var(--ok) 35%, transparent); color: var(--ok); }
+.alert-error { background: var(--danger-bg); border-color: color-mix(in srgb, var(--danger) 35%, transparent); color: var(--danger); }
+.alert-info { background: color-mix(in srgb, var(--gold) 8%, transparent); border-color: color-mix(in srgb, var(--gold) 32%, transparent); color: var(--gold-soft); }
 
 /* --- Tien ich --- */
 
@@ -391,7 +417,7 @@ details.card[open] > summary { margin-bottom: 12px; }
     display: grid;
     place-items: center;
     padding: 20px;
-    background: radial-gradient(900px 480px at 50% -10%, #241f18 0%, transparent 70%), var(--bg);
+    background: var(--bg);
 }
 
 .login-card { width: min(100%, 380px); }
@@ -419,8 +445,8 @@ details.card[open] > summary { margin-bottom: 12px; }
 .row-actions form { display: inline; }
 
 /* Khach da qua gio hen ma chua bao den - can goi kiem tra. */
-tbody tr.is-late td { background: rgba(224, 104, 95, .07); }
-tbody tr.is-late:hover td { background: rgba(224, 104, 95, .12); }
+tbody tr.is-late td { background: color-mix(in srgb, var(--danger) 7%, transparent); }
+tbody tr.is-late:hover td { background: color-mix(in srgb, var(--danger) 12%, transparent); }
 
 /* Bang xep ban o che do chi xem thi khong bam duoc. */
 form.is-readonly input { pointer-events: none; opacity: .65; }
@@ -456,7 +482,7 @@ form.is-readonly input { pointer-events: none; opacity: .65; }
 }
 
 .range-presets a:hover { border-color: var(--gold); color: var(--gold-soft); }
-.range-presets a.is-active { background: var(--gold); border-color: var(--gold); color: #17130d; font-weight: 600; }
+.range-presets a.is-active { background: var(--gold); border-color: var(--gold); color: var(--on-gold); font-weight: 600; }
 
 /* --- O so lieu --- */
 
@@ -490,14 +516,14 @@ form.is-readonly input { pointer-events: none; opacity: .65; }
 
 .kpi-delta { font-size: 12.5px; display: flex; align-items: center; gap: 5px; }
 .kpi-delta .dir { font-weight: 700; }
-.kpi-delta.up .dir { color: #8fd39a; }
-.kpi-delta.down .dir { color: #f0a9a3; }
+.kpi-delta.up .dir { color: var(--ok); }
+.kpi-delta.down .dir { color: var(--danger); }
 .kpi-delta.flat .dir { color: var(--muted); }
 .kpi-delta span { color: var(--muted); }
 
 /* Mot so chi so thi tang la xau (khong den, huy) - dao mau lai. */
-.kpi.inverse .kpi-delta.up .dir { color: #f0a9a3; }
-.kpi.inverse .kpi-delta.down .dir { color: #8fd39a; }
+.kpi.inverse .kpi-delta.up .dir { color: var(--danger); }
+.kpi.inverse .kpi-delta.down .dir { color: var(--ok); }
 
 /* --- Khung bieu do --- */
 
@@ -570,13 +596,13 @@ form.is-readonly input { pointer-events: none; opacity: .65; }
     position: absolute;
     z-index: 5;
     pointer-events: none;
-    background: #100f0d;
+    background: var(--panel-2);
     border: 1px solid var(--line);
     border-radius: 8px;
     padding: 8px 10px;
     font-size: 12.5px;
     line-height: 1.5;
-    box-shadow: 0 10px 24px rgba(0, 0, 0, .5);
+    box-shadow: 0 10px 24px rgba(16, 24, 40, .16);
     min-width: 128px;
 }
 
@@ -596,7 +622,7 @@ form.is-readonly input { pointer-events: none; opacity: .65; }
 .viz-row-head span { color: var(--muted); }
 .viz-row-head b { font-variant-numeric: tabular-nums; }
 
-.viz-row-track { height: 10px; background: #221e1a; border-radius: 5px; overflow: hidden; }
+.viz-row-track { height: 10px; background: var(--track); border-radius: 5px; overflow: hidden; }
 .viz-row-track span { display: block; height: 100%; border-radius: 5px; }
 
 /* --- Phieu quy trinh: hien so roi giua cac buoc --- */
@@ -607,7 +633,7 @@ form.is-readonly input { pointer-events: none; opacity: .65; }
     padding: 2px 0 0 2px;
 }
 
-.funnel-drop b { color: #f0a9a3; font-variant-numeric: tabular-nums; }
+.funnel-drop b { color: var(--danger); font-variant-numeric: tabular-nums; }
 
 /* Bang so lieu trong bieu do */
 .viz-table table { font-size: 13px; }

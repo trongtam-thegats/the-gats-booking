@@ -49,6 +49,12 @@ Route::prefix('quan-ly')->name('admin.')->middleware('admin.site')->group(functi
             ->where('booking', '[A-Za-z0-9]+')->name('bookings.show');
         Route::get('khach', [GuestController::class, 'index'])->name('guests.index');
 
+        // Trang chi tiet mot khach - MOT trang duy nhat, ca o tra cuu lan o
+        // phan tich deu tro ve day. Moi vai vao duoc; rieng con so tien thi
+        // trong view giau di voi vai khong xem duoc phan tich.
+        Route::get('khach-hang/{phone}', [CustomerInsightController::class, 'show'])
+            ->where('phone', '[0-9+]+')->name('customers.show');
+
         // Xu ly dat ban va xem phan tich - quan tri va quan ly
         Route::middleware('role:admin,manager')->group(function () {
             Route::get('dat-ban/tao-moi', [AdminBookingController::class, 'create'])->name('bookings.create');
@@ -57,8 +63,6 @@ Route::prefix('quan-ly')->name('admin.')->middleware('admin.site')->group(functi
             Route::get('bao-cao', [ReportController::class, 'index'])->name('reports.index');
             Route::get('hoa-don', [InvoiceController::class, 'index'])->name('invoices.index');
             Route::get('khach-hang', [CustomerInsightController::class, 'index'])->name('customers.index');
-            Route::get('khach-hang/{phone}', [CustomerInsightController::class, 'show'])
-                ->where('phone', '[0-9+]+')->name('customers.show');
 
             Route::post('dat-ban', [AdminBookingController::class, 'store'])->name('bookings.store');
             Route::post('dat-ban/{booking}/xac-nhan', [AdminBookingController::class, 'confirm'])->name('bookings.confirm');

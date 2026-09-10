@@ -3,61 +3,43 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Models\GuestNote;
-use App\Services\CustomerInsightService;
 use App\Services\GuestProfileService;
 use App\Support\SoDienThoai;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 /**
- * Tra cuu khach cho le tan: go so dien thoai la ra lich su va ghi chu,
- * xu ly duoc ngay tai cho.
+ * O tim khach cho le tan: go so dien thoai, ten hoac ma dat ban.
  *
- * Tu 09/2026 trang nay ghep them chan dung tu hoa don POS - truoc do le tan
- * phai nho sang trang Phan tich khach hang moi thay khach chi bao nhieu, hay
- * ngoi ban nao. Rieng con so tien chi hien cho vai duoc xem phan tich, vi vai
- * "chi xem" von khong duoc vao khu phan tich (xem App\Support\Roles).
+ * Trang nay chi con lam viec TIM. Tim ra roi thi chuyen sang trang chi tiet
+ * khach (customers.show) - tu 09/2026 chi con mot trang chi tiet duy nhat,
+ * dung chung cho ca tra cuu lan phan tich.
  */
 class GuestController extends AdminController
 {
-    public function __construct(
-        protected GuestProfileService $guests,
-        protected CustomerInsightService $insight,
-    ) {}
+    public function __construct(protected GuestProfileService $guests) {}
 
     public function index(Request $request)
     {
         $term = trim((string) $request->query('q', ''));
         $phone = trim((string) $request->query('phone', ''));
-        $branchIds = $request->user()->visibleBranchIds();
-
-        $results = $phone === '' ? $this->guests->search($term, $branchIds) : collect();
-        $profile = null;
+        $results = $phone === ''
+            ? $this->guests->search($term, $request->user()->visibleBranchIds())
+            : collect();
 
         // Chi co dung mot khach khop thi mo thang ho so, khoi bat bam them lan nua.
         if ($phone === '' && $results->count() === 1) {
             $phone = $results->first()['phone'];
         }
 
-        $chanDung = null;
-
+        // Chi tiet mot khach chi con MOT trang duy nhat (customers.show), dung
+        // chung cho ca tra cuu lan phan tich - truoc day hai trang hien gan het
+        // cung mot thu, nguoi dung phai nho vao dau moi thay cai minh can.
         if ($phone !== '') {
-            $profile = $this->guests->forPhone($phone, $branchIds, $this->brandIdFor($request, $phone));
-            $results = collect();
-
-            // Ghep so lieu tu hoa don POS. Khop duoc vi ca hai nguon deu di qua
-            // App\Support\SoDienThoai::chuan() - xem CLAUDE.md.
-            $chanDung = $this->insight->chanDungTuHoaDon($profile['phone'], $branchIds);
+            return redirect()->route('admin.customers.show', GuestNote::normalize($phone));
         }
 
-        return view('admin.guests.index', [
-            'term' => $term,
-            'phone' => $phone,
-            'results' => $results,
-            'profile' => $profile,
-            'chanDung' => $chanDung,
-            'xemDuocTien' => $request->user()->canSeeAnalytics(),
-        ]);
+        return view('admin.guests.index', compact('term', 'results'));
     }
 
     /**
@@ -129,7 +111,7 @@ class GuestController extends AdminController
         );
 
         return redirect()
-            ->route('admin.guests.index', ['phone' => $digits])
+            ->route('admin.customers.show', $digits)
             ->with('status', 'Đã lưu ghi chú về khách.');
     }
 

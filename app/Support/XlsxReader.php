@@ -2,13 +2,14 @@
 
 namespace App\Support;
 
+use DOMDocument;
 use Generator;
 use RuntimeException;
 use SimpleXMLElement;
-use ZipArchive;
+use XMLReader;
 
 /**
- * Doc tep .xlsx bang dung nhung gi PHP co san (ZipArchive + SimpleXML).
+ * Doc tep .xlsx bang dung nhung gi PHP co san (XMLReader + luong zip://).
  *
  * Co tinh khong dung thu vien ngoai: ca he thong nay khong co buoc build va
  * hosting chi chay PHP tran, them mot goi lon chi de doc vai tep xuat tu POS
@@ -42,29 +43,47 @@ class XlsxReader
      */
     public function rows(): Generator
     {
-        $zip = new ZipArchive;
+        $this->docChuoiChung();
 
-        if ($zip->open($this->duongDan) !== true) {
-            throw new RuntimeException('Khong mo duoc tep xlsx: '.$this->duongDan);
-        }
+        $doc = new XMLReader;
 
-        $this->docChuoiChung($zip);
-
-        $sheet = $zip->getFromName('xl/worksheets/sheet1.xml');
-
-        if ($sheet === false) {
-            $zip->close();
-
+        // Doc thang tu trong tep nen, khong bung ca bang tinh ra bo nho.
+        // Ban cu goi ZipArchive::getFromName() roi new SimpleXMLElement() tren
+        // ca chuoi do: tep mat hang 14 MB cua Gemination bung ra vai tram MB
+        // XML va giet chet tien trinh PHP. XMLReader doc tung the mot.
+        if (! @$doc->open($this->duongDanTrongNen('xl/worksheets/sheet1.xml'))) {
             throw new RuntimeException('Tep xlsx khong co bang tinh nao.');
         }
 
-        $zip->close();
+        // expand() can mot tai lieu de gan node vao, khong thi simplexml_import_dom
+        // bao "Imported Node must have associated Document".
+        $tai = new DOMDocument;
 
-        $xml = new SimpleXMLElement($sheet);
+        try {
+            while ($doc->read()) {
+                if ($doc->nodeType !== XMLReader::ELEMENT || $doc->name !== 'row') {
+                    continue;
+                }
 
-        foreach ($xml->sheetData->row as $row) {
-            yield $this->doiDong($row);
+                // Chi bung DUNG mot dong ra thanh DOM roi tra ve; het dong nay
+                // thi bo nho duoc thu hoi ngay.
+                $dom = $doc->expand($tai);
+
+                if ($dom === false) {
+                    continue;
+                }
+
+                yield $this->doiDong(simplexml_import_dom($dom));
+            }
+        } finally {
+            $doc->close();
         }
+    }
+
+    /** Duong dan kieu luong toi mot tep ben trong .xlsx. */
+    protected function duongDanTrongNen(string $ten): string
+    {
+        return 'zip://'.$this->duongDan.'#'.$ten;
     }
 
     /**
@@ -181,21 +200,46 @@ class XlsxReader
         return max(0, $so - 1);
     }
 
-    protected function docChuoiChung(ZipArchive $zip): void
+    /**
+     * Nap bang chuoi chung. Excel de moi chuoi mot lan o day roi o chi tro toi,
+     * nen bang nay chinh la du lieu chu - phai giu trong bo nho. Nhung van doc
+     * theo luong de khong nhan doi no luc phan tich XML.
+     */
+    protected function docChuoiChung(): void
     {
-        $noiDung = $zip->getFromName('xl/sharedStrings.xml');
-
-        if ($noiDung === false) {
+        if ($this->chuoiChung !== []) {
             return;
         }
 
-        $xml = new SimpleXMLElement($noiDung);
+        $doc = new XMLReader;
 
-        foreach ($xml->si as $si) {
-            // Mot o co the gom nhieu doan chu dinh dang khac nhau (<r><t>).
-            $this->chuoiChung[] = $si->t->count()
-                ? trim((string) $si->t)
-                : trim(implode('', array_map(fn ($r) => (string) $r->t, iterator_to_array($si->r))));
+        if (! @$doc->open($this->duongDanTrongNen('xl/sharedStrings.xml'))) {
+            return;   // Tep chi toan so thi khong co bang chuoi chung.
+        }
+
+        $tai = new DOMDocument;
+
+        try {
+            while ($doc->read()) {
+                if ($doc->nodeType !== XMLReader::ELEMENT || $doc->name !== 'si') {
+                    continue;
+                }
+
+                $dom = $doc->expand($tai);
+
+                if ($dom === false) {
+                    continue;
+                }
+
+                $si = simplexml_import_dom($dom);
+
+                // Mot o co the gom nhieu doan chu dinh dang khac nhau (<r><t>).
+                $this->chuoiChung[] = $si->t->count()
+                    ? trim((string) $si->t)
+                    : trim(implode('', array_map(fn ($r) => (string) $r->t, iterator_to_array($si->r))));
+            }
+        } finally {
+            $doc->close();
         }
     }
 }

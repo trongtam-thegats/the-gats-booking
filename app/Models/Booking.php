@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Support\NguonDatBan;
+use App\Support\SoDienThoai;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -94,6 +95,33 @@ class Booking extends Model
     public function scopeForDate(Builder $query, string $date): Builder
     {
         return $query->whereDate('booking_date', $date);
+    }
+
+    /**
+     * Loc theo mot so dien thoai DA CHUAN HOA.
+     *
+     * Cot nay luu nguyen van khach go ("+84 865 683 649", "0865.683.649"...),
+     * nen phai boc het ky tu khong phai chu so o ca hai ve roi moi so. Va phai
+     * thu ca dang +84: cung mot nguoi co the go hai kieu o hai lan dat khac nhau.
+     *
+     * Da tung hong hai lan vi cho nay: so nuoc ngoai tra khong ra dat ban, va
+     * trang chi tiet khach bao 404 khi so luu co dau cach.
+     */
+    public function scopeCuaSoDienThoai(Builder $query, string $chuan): Builder
+    {
+        $bienThe = SoDienThoai::bienTheChiSo($chuan);
+
+        if ($bienThe === []) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        $cot = 'customer_phone';
+
+        foreach ([' ', '-', '.', '(', ')', '+'] as $ky) {
+            $cot = "REPLACE($cot, '$ky', '')";
+        }
+
+        return $query->whereIn($query->getQuery()->raw($cot), $bienThe);
     }
 
     /** Ma dat ban gui cho khach, vi du TG7KQ4M2. */

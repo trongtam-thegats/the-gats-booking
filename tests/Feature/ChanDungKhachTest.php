@@ -7,15 +7,20 @@ use App\Models\Branch;
 use App\Models\Brand;
 use App\Models\Invoice;
 use App\Models\User;
+use App\Services\CustomerInsightService;
 use App\Support\Roles;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
 /**
- * Trang Tra cuu khach phai ghep duoc ca hai nguon: dat ban va hoa don POS.
+ * Chi tiet mot khach chi con MOT trang duy nhat.
  *
- * Truoc day trang nay chi doc dat ban, le tan phai nho sang trang Phan tich
- * khach hang moi biet khach chi bao nhieu hay hay ngoi ban nao.
+ * Truoc day co hai trang gan het giong nhau: Tra cuu khach (chi doc dat ban)
+ * va Phan tich khach hang (chi doc hoa don). Nay go so o o tim la chuyen thang
+ * sang trang chi tiet, va trang do co ca hai nguon.
+ *
+ * Vai "chi xem" cung vao duoc trang nay - le tan can biet khach hay ngoi ban
+ * nao, uong gi - nhung con so tien thi giau di.
  */
 class ChanDungKhachTest extends TestCase
 {
@@ -76,9 +81,15 @@ class ChanDungKhachTest extends TestCase
         ]);
     }
 
+    /**
+     * Di dung duong nguoi dung di: go so o Tra cuu khach, roi de he thong
+     * chuyen sang trang chi tiet khach (chi con MOT trang chi tiet duy nhat).
+     */
     protected function tra(User $u, string $sdt = self::SDT)
     {
-        return $this->actingAs($u)->get(route('admin.guests.index', ['phone' => $sdt]));
+        return $this->actingAs($u)
+            ->followingRedirects()
+            ->get(route('admin.guests.index', ['phone' => $sdt]));
     }
 
     public function test_quan_ly_tra_so_dien_thoai_thay_ca_hanh_vi_lan_so_tien(): void
@@ -88,10 +99,11 @@ class ChanDungKhachTest extends TestCase
 
         $this->tra($this->nguoiDung(Roles::MANAGER))
             ->assertOk()
-            ->assertSee('Chân dung từ hóa đơn')
+            ->assertSee('Thói quen')
             ->assertSee('Bar 5')            // bàn hay ngồi
             ->assertSee('2 – 3 giờ')        // khoảng ngồi: đúng 120 phút rơi vào đây
             ->assertSee('2 người')          // hay đi 2 người
+            ->assertSee('Tổng chi tiêu')
             ->assertSee('800,000');         // chi trung bình
     }
 
@@ -103,14 +115,15 @@ class ChanDungKhachTest extends TestCase
         $phanHoi = $this->tra($this->nguoiDung(Roles::VIEWER))->assertOk();
 
         // Van thay duoc thoi quen - do la thu le tan can khi don khach.
-        $phanHoi->assertSee('Chân dung từ hóa đơn')
+        $phanHoi->assertSee('Thói quen')
             ->assertSee('Bar 5')
-            ->assertSee('2 người');
+            ->assertSee('2 người')
+            ->assertSee('Số lần đã ghé');
 
-        // Nhung khong thay tien, va khong co loi moi sang trang phan tich.
+        // Nhung khong thay tien, va khong thay ca danh sach hoa don.
         $phanHoi->assertDontSee('800,000')
-            ->assertDontSee('Chi trung bình')
-            ->assertDontSee('Xem hồ sơ phân tích đầy đủ');
+            ->assertDontSee('Tổng chi tiêu')
+            ->assertDontSee('Trung bình mỗi lần');
     }
 
     public function test_khach_chua_co_hoa_don_thi_bao_ro_chu_khong_vo_trang(): void
@@ -129,8 +142,8 @@ class ChanDungKhachTest extends TestCase
 
         $this->tra($this->nguoiDung(Roles::MANAGER))
             ->assertOk()
-            ->assertDontSee('Chân dung từ hóa đơn')
-            ->assertSee('Chưa có hóa đơn nào khớp số điện thoại này');
+            ->assertSee('Khách mới')
+            ->assertSee('chưa khớp được hóa đơn nào');
     }
 
     public function test_so_dien_thoai_go_kieu_khac_van_ghep_duoc_hoa_don(): void
@@ -141,7 +154,7 @@ class ChanDungKhachTest extends TestCase
         // SoDienThoai::chuan() nen van phai ra dung khach.
         $this->tra($this->nguoiDung(Roles::MANAGER), '090 000 0001')
             ->assertOk()
-            ->assertSee('Chân dung từ hóa đơn');
+            ->assertSee('Bar 5');
     }
 
     public function test_hoa_don_cua_khach_khac_khong_lan_sang(): void
@@ -155,14 +168,21 @@ class ChanDungKhachTest extends TestCase
             ->assertDontSee('5,000,000');
     }
 
-    public function test_hoa_don_da_huy_khong_tinh_vao_chan_dung(): void
+    public function test_hoa_don_da_huy_khong_tinh_vao_tong_chi_tieu(): void
     {
         $this->hoaDon('E1');
         $this->hoaDon('E2')->update(['status' => Invoice::HUY, 'total' => 9_000_000]);
 
+        // Trang VAN liet ke hoa don da huy (kem nhan "Da huy") - dung nhu vay,
+        // nhan vien can thay. Nhung no khong duoc cong vao chi so nao.
         $this->tra($this->nguoiDung(Roles::MANAGER))
             ->assertOk()
-            ->assertSee('800,000')
-            ->assertDontSee('9,000,000');
+            ->assertSee('Đã hủy');
+
+        $co = app(CustomerInsightService::class)
+            ->profile(self::SDT, null)['stats'];
+
+        $this->assertSame(1, $co['visits']);
+        $this->assertEqualsWithDelta(800_000, $co['spend'], 0.01);
     }
 }

@@ -8,6 +8,7 @@ use App\Models\Brand;
 use App\Models\GuestNote;
 use App\Models\User;
 use App\Services\BookingService;
+use App\Services\GuestProfileService;
 use App\Support\Roles;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
@@ -188,7 +189,9 @@ class GuestAndRescheduleTest extends TestCase
     {
         $this->makeBooking();
 
+        // Chi mot khach khop thi o tim chuyen thang sang trang chi tiet.
         $this->actingAs($this->manager)
+            ->followingRedirects()
             ->get(route('admin.guests.index', ['q' => '0987654321']))
             ->assertOk()
             ->assertSee('Lê Văn Quen');
@@ -204,13 +207,14 @@ class GuestAndRescheduleTest extends TestCase
         $second->update(['status' => Booking::STATUS_COMPLETED]);
 
         $response = $this->actingAs($this->manager)
+            ->followingRedirects()
             ->get(route('admin.guests.index', ['phone' => '0987654321']));
 
         $response->assertOk()
             ->assertSee('Hẹn mà không tới')
             ->assertSee('Lê Văn Quen');
 
-        $profile = app(\App\Services\GuestProfileService::class)
+        $profile = app(GuestProfileService::class)
             ->forPhone('0987654321', null, $this->brand->id);
 
         $this->assertSame(3, $profile['total']);
