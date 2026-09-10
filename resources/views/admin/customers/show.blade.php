@@ -239,72 +239,6 @@
         </details>
     @endif
 
-    {{-- Ghi chu cua quan + cac moc thoi gian. Truoc day hai khoi nay chi co o
-         trang Tra cuu khach; nay gop ve mot trang chi tiet duy nhat. --}}
-    <div class="grid-2">
-        <div class="card">
-            <h2>Ghi chú của quán</h2>
-            <p class="sub">Chỉ nhân viên thấy. Khách không đọc được phần này.</p>
-
-            @if (auth()->user()->canWrite())
-                <form method="post" action="{{ route('admin.guests.note') }}">
-                    @csrf
-                    <input type="hidden" name="phone" value="{{ $ho['phone'] }}">
-                    <div class="field">
-                        <label for="guest_name">Tên gọi</label>
-                        <input type="text" id="guest_name" name="name"
-                               value="{{ $ghiChu?->name ?? $ho['name'] }}" maxlength="120">
-                    </div>
-                    <div class="field" style="margin-top:12px">
-                        <label for="guest_note">Ghi chú</label>
-                        <textarea id="guest_note" name="note" maxlength="1000"
-                                  placeholder="Thích bàn cạnh cửa sổ, dị ứng hải sản, hay đi cùng đối tác…">{{ $ghiChu?->note }}</textarea>
-                    </div>
-                    <div style="margin-top:12px">
-                        <label class="check">
-                            <input type="checkbox" name="is_vip" value="1" @checked($ghiChu?->is_vip)> Khách VIP
-                        </label>
-                        <label class="check">
-                            <input type="checkbox" name="is_blocked" value="1" @checked($ghiChu?->is_blocked)>
-                            Chặn đặt bàn trực tuyến
-                        </label>
-                        <p class="hint" style="margin:6px 0 0">
-                            Chặn rồi thì khách không tự đặt online được nữa, nhưng nhân viên vẫn đặt hộ được.
-                        </p>
-                    </div>
-                    <button class="btn btn-ghost btn-sm" type="submit" style="margin-top:14px">Lưu ghi chú</button>
-                </form>
-            @else
-                <p class="mb-0">{{ $ghiChu?->note ?: 'Chưa có ghi chú.' }}</p>
-            @endif
-
-            @if ($ghiChu?->updatedBy)
-                <p class="hint" style="margin-top:12px">
-                    Cập nhật lần cuối bởi {{ $ghiChu->updatedBy->name }} · {{ $ghiChu->updated_at->format('H:i d/m/Y') }}
-                </p>
-            @endif
-        </div>
-
-        <div class="card">
-            <h2>Đặt bàn</h2>
-            <table>
-                <tbody>
-                <tr><td class="muted">Số lần đặt</td><td class="num">{{ $dat['total'] }}</td></tr>
-                <tr><td class="muted">Đã đến</td><td class="num">{{ $dat['arrived'] }}</td></tr>
-                <tr><td class="muted">Hẹn mà không tới</td><td class="num">{{ $dat['no_show'] }}</td></tr>
-                <tr><td class="muted">Đã hủy</td><td class="num">{{ $dat['cancelled'] }}</td></tr>
-                <tr>
-                    <td class="muted">Tỉ lệ đến</td>
-                    <td class="num">{{ $dat['show_rate'] === null ? '—' : $dat['show_rate'].'%' }}</td>
-                </tr>
-                </tbody>
-            </table>
-            <p class="hint" style="margin-top:10px">
-                Mẫu số của tỉ lệ đến là <b>đến + không đến</b>, không tính đơn hủy.
-            </p>
-        </div>
-    </div>
-
     <div class="card">
         <h2>Thói quen</h2>
         <p class="muted small">Tính trên {{ $co['visits'] }} hóa đơn đã thanh toán. Hóa đơn chốt sau nửa đêm được tính vào đêm hôm trước.</p>
@@ -432,4 +366,71 @@
             </div>
         </div>
     @endif
+
+    {{-- Ghi chu cua quan + so lieu dat ban. De cuoi trang: nhan vien mo ho so
+         la de xem khach chi tieu va thoi quen truoc, ghi chu chi dung khi can. --}}
+    <div class="grid-2">
+        <div class="card">
+            <h2>Ghi chú của quán</h2>
+            <p class="sub">Chỉ nhân viên thấy. Khách không đọc được phần này.</p>
+
+            @if (auth()->user()->canWrite())
+                <form method="post" action="{{ route('admin.guests.note') }}">
+                    @csrf
+                    <input type="hidden" name="phone" value="{{ $ho['phone'] }}">
+                    <div class="field">
+                        <label for="guest_name">Tên gọi</label>
+                        <input type="text" id="guest_name" name="name"
+                               value="{{ $ghiChu?->name ?? $ho['name'] }}" maxlength="120">
+                    </div>
+                    <div class="field" style="margin-top:12px">
+                        <label for="guest_note">Ghi chú</label>
+                        <textarea id="guest_note" name="note" maxlength="1000"
+                                  placeholder="Thích bàn cạnh cửa sổ, dị ứng hải sản, hay đi cùng đối tác…">{{ $ghiChu?->note }}</textarea>
+                    </div>
+                    <div style="margin-top:12px">
+                        <label class="check">
+                            <input type="checkbox" name="is_vip" value="1" @checked($ghiChu?->is_vip)> Khách VIP
+                        </label>
+                        <label class="check">
+                            <input type="checkbox" name="is_blocked" value="1" @checked($ghiChu?->is_blocked)>
+                            Chặn đặt bàn trực tuyến
+                        </label>
+                        <p class="hint" style="margin:6px 0 0">
+                            Chặn rồi thì khách không tự đặt online được nữa, nhưng nhân viên vẫn đặt hộ được.
+                        </p>
+                    </div>
+                    <button class="btn btn-ghost btn-sm" type="submit" style="margin-top:14px">Lưu ghi chú</button>
+                </form>
+            @else
+                <p class="mb-0">{{ $ghiChu?->note ?: 'Chưa có ghi chú.' }}</p>
+            @endif
+
+            @if ($ghiChu?->updatedBy)
+                <p class="hint" style="margin-top:12px">
+                    Cập nhật lần cuối bởi {{ $ghiChu->updatedBy->name }} · {{ $ghiChu->updated_at->format('H:i d/m/Y') }}
+                </p>
+            @endif
+        </div>
+
+        <div class="card">
+            <h2>Đặt bàn</h2>
+            <table>
+                <tbody>
+                <tr><td class="muted">Số lần đặt</td><td class="num">{{ $dat['total'] }}</td></tr>
+                <tr><td class="muted">Đã đến</td><td class="num">{{ $dat['arrived'] }}</td></tr>
+                <tr><td class="muted">Hẹn mà không tới</td><td class="num">{{ $dat['no_show'] }}</td></tr>
+                <tr><td class="muted">Đã hủy</td><td class="num">{{ $dat['cancelled'] }}</td></tr>
+                <tr>
+                    <td class="muted">Tỉ lệ đến</td>
+                    <td class="num">{{ $dat['show_rate'] === null ? '—' : $dat['show_rate'].'%' }}</td>
+                </tr>
+                </tbody>
+            </table>
+            <p class="hint" style="margin-top:10px">
+                Mẫu số của tỉ lệ đến là <b>đến + không đến</b>, không tính đơn hủy.
+            </p>
+        </div>
+    </div>
+
 @endsection
