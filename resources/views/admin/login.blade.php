@@ -4,7 +4,7 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Đăng nhập · The Gats Booking</title>
-    <link rel="stylesheet" href="{{ asset('css/admin.css') }}">
+    <link rel="stylesheet" href="{{ \App\Support\Assets::url('css/admin.css') }}">
 </head>
 <body class="login-page">
 <div class="card login-card">

@@ -1,37 +1,40 @@
 /* Khu quan tri - The Gats Booking */
 
 :root {
-    /* Nen sang. Giu vang dong lam mau nhan dien, nhung dam hon ban cu vi
-       vang nhat (#c8a15a) doc khong ra tren nen trang. */
-    --bg: #f4f5f7;          /* nen trang */
-    --panel: #ffffff;       /* the */
-    --panel-2: #f7f8fa;     /* o long trong the */
-    --side-bg: #ffffff;     /* cot dieu huong */
-    --hover: #f1f3f6;       /* di chuot qua dong bang, muc menu */
-    --line: #e3e6ea;
-    --line-soft: #eef0f3;
-    --track: #e8ebef;       /* thanh nen cua bieu do ngang */
+    /* Nen toi, chu sang. Da thu nen sang mot lan (09/2026) roi doi lai theo y
+       nguoi dung. Moi mau deu di qua bien o day - doi tong chi sua khoi nay,
+       khong phai lan xuong duoi. */
+    --bg: #0f0e0d;          /* nen trang */
+    --panel: #1a1816;       /* the */
+    --panel-2: #211e1b;     /* o long trong the */
+    --side-bg: #141210;     /* cot dieu huong, toi hon the mot chut */
+    --hover: #1e1b18;       /* di chuot qua dong bang, muc menu */
+    --line: #2f2a25;
+    --line-soft: #262220;
+    --track: #221e1a;       /* thanh nen cua bieu do ngang */
 
-    --text: #1c2430;
-    --muted: #6b7684;
-    --faint: #98a2b0;       /* chu mo nhat: ghi chu chan cot */
+    --text: #efeae3;
+    --muted: #9b9188;
+    --faint: #6b6259;       /* chu mo nhat: ghi chu chan cot */
 
-    --gold: #b07d2c;
-    --gold-soft: #8a6220;   /* mau chu lien ket - phai du dam tren nen trang */
-    --on-gold: #ffffff;     /* chu tren nut vang */
+    --gold: #c8a15a;
+    --gold-soft: #e0c48c;
+    --on-gold: #17130d;     /* chu tren nut vang - nen toi thi chu phai dam */
 
-    --danger: #c9372c;
-    --ok: #1f7a45;
-    --info: #2f6fb5;
+    /* Ba mau nay lay theo sac CHU tren nen toi, khong lay sac dam: nen toi thi
+       mau dam doc khong ra. Cac vien va nen nhat deu suy ra tu day. */
+    --danger: #f0a9a3;
+    --ok: #8fd39a;
+    --info: #a8c8ee;
 
     /* Nen nhat cua nhan trang thai va hop canh bao */
-    --ok-bg: #e7f4ec;
-    --danger-bg: #fdeceb;
-    --info-bg: #e9f1fb;
-    --neutral-bg: #eef0f3;
+    --ok-bg: rgba(111, 191, 122, .16);
+    --danger-bg: rgba(224, 104, 95, .14);
+    --info-bg: rgba(120, 170, 230, .16);
+    --neutral-bg: rgba(160, 160, 160, .14);
 
     --radius: 12px;
-    --shadow: 0 1px 2px rgba(16, 24, 40, .05), 0 1px 3px rgba(16, 24, 40, .06);
+    --shadow: 0 1px 2px rgba(0, 0, 0, .35);
 }
 
 * { box-sizing: border-box; }

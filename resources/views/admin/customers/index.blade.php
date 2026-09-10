@@ -70,20 +70,20 @@
     };
 
     // --- Bieu do 1: co cau khach theo tinh trang ---------------------------
-    // Mau cot chon cho NEN SANG: ban cu (#6fbf7a, #78aae6...) la mau nhat
-    // danh cho nen toi, dat len trang thi nhat thech, doc khong ra.
+    // Mau cot chon cho NEN TOI: mau dam dat tren nen toi thi chim, phai dung
+    // sac nhat. Da thu bo dam mot lan hoi doi sang nen sang roi doi lai.
     $mauCot = [
-        'deu_dan' => '#1f7a45',
-        'khach_moi' => '#2f6fb5',
-        'thua_dan' => '#b07d2c',
-        'nguy_co' => '#c9372c',
-        'mot_lan' => '#8b95a1',
-        'xn_se_quay_lai' => '#2f9e63',
-        'xn_khong_quan_tam' => '#a8443d',
-        'xn_da_chuyen_di' => '#7b8592',
-        'xn_so_sai' => '#7b8592',
-        'xn_da_roi_bo' => '#8d2f27',
-        'xn_khong_can' => '#7b8592',
+        'deu_dan' => '#6fbf7a',
+        'khach_moi' => '#78aae6',
+        'thua_dan' => '#c8a15a',
+        'nguy_co' => '#e0685f',
+        'mot_lan' => '#8a8a8a',
+        'xn_se_quay_lai' => '#8fd39a',
+        'xn_khong_quan_tam' => '#c2564f',
+        'xn_da_chuyen_di' => '#6f6a63',
+        'xn_so_sai' => '#6f6a63',
+        'xn_da_roi_bo' => '#a8443d',
+        'xn_khong_can' => '#6f6a63',
     ];
 
     $dongNhom = collect(Insight::moiTinhTrang())
