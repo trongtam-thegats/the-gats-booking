@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Admin;
 
 use App\Models\GuestNote;
+use App\Models\Invoice;
 use App\Services\GuestProfileService;
 use App\Support\SoDienThoai;
 use Illuminate\Http\JsonResponse;
@@ -97,7 +98,12 @@ class GuestController extends AdminController
         $digits = GuestNote::normalize($data['phone']);
         $brandId = $this->brandIdFor($request, $digits);
 
-        abort_if(! $brandId, 422, 'Chưa xác định được khách này thuộc quán nào.');
+        if (! $brandId) {
+            return back()->withErrors([
+                'note' => 'Chưa xác định được khách này thuộc quán nào, nên chưa lưu được ghi chú. '
+                    .'Khách cần có ít nhất một hóa đơn hoặc một lần đặt bàn ở một quán.',
+            ]);
+        }
 
         GuestNote::updateOrCreate(
             ['brand_id' => $brandId, 'phone' => $digits],
@@ -125,10 +131,24 @@ class GuestController extends AdminController
             return (int) $request->user()->brand_id;
         }
 
-        $latest = $this->guests
-            ->forPhone($phone, $request->user()->visibleBranchIds())['bookings']
-            ->first();
+        $branchIds = $request->user()->visibleBranchIds();
 
-        return $latest?->branch?->brand_id;
+        $latest = $this->guests->forPhone($phone, $branchIds)['bookings']->first();
+
+        if ($latest?->branch?->brand_id) {
+            return (int) $latest->branch->brand_id;
+        }
+
+        // Khach chi co hoa don, chua tung dat ban - 87% khach nhan dien duoc la
+        // kieu nay. Truoc day form ghi chu chi nam o trang tim theo dat ban nen
+        // luon co don de suy ra quan; tu khi gop ve mot trang chi tiet thi khong
+        // con dung nua, va quan tri luu ghi chu bi bao 422.
+        return Invoice::query()
+            ->choDiaDiem($branchIds)
+            ->where('customer_phone', $phone)
+            ->latest('paid_at')
+            ->with('branch:id,brand_id')
+            ->first()
+            ?->branch?->brand_id;
     }
 }
