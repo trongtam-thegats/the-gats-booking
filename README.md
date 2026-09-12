@@ -119,6 +119,18 @@ php artisan booking:remind
 
 Mặc định nhắc trước 180 phút (`BOOKING_REMINDER_LEAD_MINUTES`), và không nhắc lại booking đã nhắc.
 
+Cron chạy 5 phút một lần nên mỗi đơn bị quét lại vài chục lần trong khung nhắc. Việc chống trùng xét
+**riêng từng kênh**: kênh đã `sent` hoặc `skipped` thì thôi, kênh `failed` được thử lại tối đa 3 lần.
+Nếu chỉ xét `sent` như bản đầu, đơn nào khách không để email sẽ bị ghi lại một dòng `skipped` sau mỗi
+lần cron chạy — xem `SendBookingReminders::kenhCanNhac()`.
+
+Dọn dòng nhật ký nhắc lịch bị lặp còn sót lại (giữ dòng đầu tiên mỗi kênh/kết quả):
+
+```bash
+php artisan booking:don-nhat-ky        # chỉ xem trước
+php artisan booking:don-nhat-ky --ghi  # xóa thật
+```
+
 ---
 
 ## 5. Bản đồ mã nguồn

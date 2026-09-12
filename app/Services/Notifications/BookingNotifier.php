@@ -24,20 +24,34 @@ class BookingNotifier
     ];
 
     /**
+     * Danh sach kenh dang bat trong config, da loai bo ten kenh khong hop le.
+     *
+     * @return array<int, string>
+     */
+    public function channels(): array
+    {
+        return array_values(array_filter(
+            (array) config('booking.channels', []),
+            fn ($key) => isset(self::CHANNELS[$key]),
+        ));
+    }
+
+    /**
+     * @param  array<int, string>|null  $only  Chi gui qua nhung kenh nay; null la gui het.
      * @return array<int, NotificationLog>
      */
-    public function send(Booking $booking, string $event): array
+    public function send(Booking $booking, string $event, ?array $only = null): array
     {
         $booking->loadMissing(['branch', 'diningTables']);
 
         $logs = [];
 
-        foreach ((array) config('booking.channels', []) as $key) {
-            $class = self::CHANNELS[$key] ?? null;
-
-            if (! $class) {
+        foreach ($this->channels() as $key) {
+            if ($only !== null && ! in_array($key, $only, true)) {
                 continue;
             }
+
+            $class = self::CHANNELS[$key];
 
             $logs[] = $this->sendVia(new $class, $booking, $event);
         }
