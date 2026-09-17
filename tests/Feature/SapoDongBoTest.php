@@ -130,6 +130,21 @@ class SapoDongBoTest extends TestCase
         $this->assertEquals(264200, Invoice::first()->vat);
     }
 
+    public function test_don_cu_nap_sau_khong_ha_hang_the(): void
+    {
+        // Sapo tra don moi truoc: don 17/09 hang VIP, roi don 01/09 luc con STARTER.
+        $this->gui([
+            $this->don(),
+            $this->don([
+                'loyalty_card' => ['name' => 'STARTER'],
+                'payments' => [['client_time' => 1788200000, 'payment_method_name' => 'Tiền mặt', 'receipt_number' => '9000140000']],
+            ]),
+        ])->assertJson(['moi' => 2]);
+
+        $this->assertSame('VIP', PosCustomer::where('phone', '0865683649')->value('tier'));
+        $this->assertSame('STARTER', Invoice::where('code', '9000140000')->value('membership_card'));
+    }
+
     public function test_gui_lai_khong_sinh_ban_trung(): void
     {
         $this->gui([$this->don()]);

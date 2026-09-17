@@ -88,7 +88,11 @@ class SapoDongBoService
                     $ketQua['mon'] += count($mon);
                 }
 
-                if ($this->theKhach($don)) {
+                $moiNhat = $hoaDon['customer_phone'] !== '' && ! Invoice::where('customer_phone', $hoaDon['customer_phone'])
+                    ->where('paid_at', '>', $hoaDon['paid_at'])
+                    ->exists();
+
+                if ($this->theKhach($don, $moiNhat)) {
                     $ketQua['khach']++;
                 }
             }
@@ -204,7 +208,7 @@ class SapoDongBoService
      * Cap nhat the khach hang POS tu thong tin khach kem theo don.
      * Chi ghi de o nao Sapo co gia tri - khong xoa trang hang the, ghi chu cu.
      */
-    protected function theKhach(array $don): bool
+    protected function theKhach(array $don, bool $laHoaDonMoiNhat): bool
     {
         $khach = is_array($don['customer'] ?? null) ? $don['customer'] : [];
         $sdt = SoDienThoai::chuan($khach['phone'] ?? null);
@@ -223,8 +227,16 @@ class SapoDongBoService
             'note' => $this->chuoi($khach['note'] ?? null, 1000),
             'joined_at' => $this->ngay($khach['created_on'] ?? null),
             'member_code' => $this->chuoi($khach['member_code'] ?? null, 60),
-            'tier' => $this->chuoi($don['loyalty_card']['name'] ?? null, 60),
         ], fn ($gt) => $gt !== null);
+
+        // Hang the tren don la hang LUC DAT DON. Sapo tra don moi nhat truoc,
+        // nen neu cu lay theo don thi don cu nap sau se ha hang khach xuong.
+        // Chi lay khi day la hoa don gan nhat cua so nay.
+        $hang = $this->chuoi($don['loyalty_card']['name'] ?? null, 60);
+
+        if ($hang !== null && $laHoaDonMoiNhat) {
+            $moi['tier'] = $hang;
+        }
 
         foreach (['order_count' => 'invoice_count', 'loyalty_point' => 'points'] as $nguon => $cot) {
             if (isset($khach[$nguon])) {
