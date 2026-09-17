@@ -3,10 +3,12 @@
 namespace App\Services;
 
 use App\Models\Booking;
+use App\Models\Invoice;
 use App\Models\GuestNote;
 use App\Models\PosCustomer;
 use App\Support\SoDienThoai;
 use App\Support\TenKhach;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 
 /**
@@ -77,8 +79,13 @@ class GuestProfileService
      * Tim khach theo so dien thoai, ten hoac ma dat ban.
      * Gom theo so dien thoai de moi khach chi hien mot dong.
      *
+     * Quet ca BA nguon: dat ban, hoa don POS va danh sach khach hang POS. Ban
+     * cu chi quet dat ban, trong khi 87% khach nhan dien duoc chua tung dat
+     * ban nao - ho co trong danh sach khach hang ma go so vao thi "khong tim
+     * thay". Dung bo nguon nao ra nua.
+     *
      * @param  array<int, int>|null  $branchIds
-     * @return Collection<int, array{phone: string, name: string, total: int, last: ?Booking}>
+     * @return Collection<int, array{phone: string, name: ?string, bookings: int, visits: int, last: ?Carbon, card: ?PosCustomer}>
      */
     public function search(string $term, ?array $branchIds, int $limit = 25): Collection
     {
@@ -88,33 +95,117 @@ class GuestProfileService
             return collect();
         }
 
-        $digits = GuestNote::normalize($term);
         $like = '%'.$term.'%';
+        // Mot hai chu so lan trong ten hay ma thi dung dem di so dien thoai,
+        // khong thi go "E7" cung khop hang nghin so.
+        $chiSo = strlen((string) preg_replace('/\D/', '', $term)) >= 4
+            ? SoDienThoai::bienTheChiSo(GuestNote::normalize($term))
+            : [];
 
-        return Booking::query()
+        /** @var array<string, array<string, mixed>> $khach */
+        $khach = [];
+        $gap = function (string $phone) use (&$khach): ?string {
+            $phone = GuestNote::normalize($phone);
+
+            if ($phone === '') {
+                return null;
+            }
+
+            $khach[$phone] ??= ['phone' => $phone, 'names' => [], 'bookings' => 0, 'visits' => 0, 'last' => null];
+
+            return $phone;
+        };
+        $moiHon = fn (?Carbon $a, ?Carbon $b) => $a === null || ($b !== null && $b->gt($a)) ? $b : $a;
+
+        // 1. Dat ban.
+        $datBan = Booking::query()
             ->when($branchIds !== null, fn ($q) => $q->whereIn('branch_id', $branchIds ?: [0]))
-            ->where(function ($q) use ($like, $digits) {
+            ->where(function ($q) use ($like, $chiSo) {
                 $q->where('customer_name', 'like', $like)
                     ->orWhere('code', 'like', $like);
 
-                // Thu ca cac dang khach co the go, khong chi dang da chuan hoa.
-                foreach (SoDienThoai::bienTheChiSo($digits) as $chiSo) {
-                    $q->orWhereRaw($this->digitsOnlyExpression().' like ?', ['%'.$chiSo.'%']);
+                foreach ($chiSo as $so) {
+                    $q->orWhereRaw($this->digitsOnlyExpression().' like ?', ['%'.$so.'%']);
                 }
             })
-            ->with(['branch', 'diningTables'])
             ->orderByDesc('booking_date')
-            ->orderByDesc('start_time')
             ->limit(300)
-            ->get()
-            ->groupBy(fn (Booking $b) => GuestNote::normalize($b->customer_phone))
-            ->map(fn (Collection $rows, string $phone) => [
-                'phone' => $phone,
-                'name' => $rows->first()->customer_name,
-                'total' => $rows->count(),
-                'last' => $rows->first(),
-            ])
-            ->sortByDesc(fn (array $row) => $row['last']->booking_date->timestamp)
+            ->get(['customer_name', 'customer_phone', 'booking_date']);
+
+        foreach ($datBan as $b) {
+            if ($phone = $gap((string) $b->customer_phone)) {
+                $khach[$phone]['bookings']++;
+                $khach[$phone]['names'][] = $b->customer_name;
+                $khach[$phone]['last'] = $moiHon($khach[$phone]['last'], $b->booking_date);
+            }
+        }
+
+        // 2. Hoa don POS - dem bang SQL de khach ghe 400 lan van dem dung.
+        // customer_phone cua hoa don da duoc chuan hoa luc nhap.
+        $hoaDon = Invoice::query()
+            ->choDiaDiem($branchIds)
+            ->thanhCong()
+            ->coKhach()
+            ->where(function ($q) use ($like, $chiSo) {
+                $q->where('customer_name', 'like', $like);
+
+                foreach ($chiSo as $so) {
+                    $q->orWhere('customer_phone', 'like', '%'.$so.'%');
+                }
+            })
+            ->selectRaw('customer_phone, COUNT(*) as so_lan, MAX(paid_at) as gan_nhat, MAX(customer_name) as ten')
+            ->groupBy('customer_phone')
+            ->orderByDesc('gan_nhat')
+            ->limit(300)
+            ->get();
+
+        foreach ($hoaDon as $h) {
+            if ($phone = $gap((string) $h->customer_phone)) {
+                $khach[$phone]['visits'] += (int) $h->so_lan;
+                $khach[$phone]['names'][] = $h->ten;
+                $khach[$phone]['last'] = $moiHon($khach[$phone]['last'], $h->gan_nhat ? Carbon::parse($h->gan_nhat) : null);
+            }
+        }
+
+        // 3. Danh sach khach hang POS (toan chuoi, khong gan dia diem). Nguoi
+        // chi xem mot quan thi chi dung de lay ten cho khach da gap o tren,
+        // khong mo rong ra khach cua quan khac.
+        $the = PosCustomer::query()
+            ->where(function ($q) use ($like, $chiSo) {
+                $q->where('name', 'like', $like);
+
+                foreach ($chiSo as $so) {
+                    $q->orWhere('phone', 'like', '%'.$so.'%');
+                }
+            })
+            ->limit(300)
+            ->get();
+
+        if ($branchIds === null) {
+            foreach ($the as $c) {
+                $gap((string) $c->phone);
+            }
+        }
+
+        if ($khach === []) {
+            return collect();
+        }
+
+        $sdt = array_keys($khach);
+        $theTheoSo = $the->keyBy('phone')
+            ->union(PosCustomer::whereIn('phone', $sdt)->get()->keyBy('phone'));
+        $ghiChu = GuestNote::whereIn('phone', $sdt)->whereNotNull('name')->get()->keyBy('phone');
+
+        return collect($khach)
+            ->map(function (array $k) use ($theTheoSo, $ghiChu) {
+                $card = $theTheoSo[$k['phone']] ?? null;
+                $k['card'] = $card;
+                $k['name'] = TenKhach::chon($ghiChu[$k['phone']] ?? null, $card, ...$k['names']);
+                unset($k['names']);
+
+                return $k;
+            })
+            ->sortByDesc(fn (array $k) => [$k['last']?->timestamp ?? 0, $k['visits'] + $k['bookings']])
             ->take($limit)
             ->values();
     }

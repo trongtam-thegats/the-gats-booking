@@ -6,7 +6,7 @@
     <div class="page-head">
         <div>
             <h1>Tra cứu khách</h1>
-            <p>Gõ số điện thoại, tên hoặc mã đặt bàn. Khách gọi tới là biết ngay họ đã đến bao nhiêu lần.</p>
+            <p>Gõ số điện thoại, tên hoặc mã đặt bàn. Tìm cả khách chưa từng đặt bàn — có hoá đơn hoặc có trong danh sách khách hàng Sapo là ra.</p>
         </div>
     </div>
 
@@ -29,18 +29,26 @@
             <div class="table-wrap">
                 <table>
                     <thead>
-                    <tr><th>Khách</th><th>Điện thoại</th><th class="num">Số lần đặt</th><th>Lần gần nhất</th><th></th></tr>
+                    <tr><th>Khách</th><th>Điện thoại</th><th class="num">Lần ghé (hoá đơn)</th><th class="num">Lần đặt bàn</th><th>Gần nhất</th><th></th></tr>
                     </thead>
                     <tbody>
                     @foreach ($results as $row)
                         <tr>
-                            <td><b>{{ $row['name'] }}</b></td>
-                            <td>{{ $row['last']->customer_phone }}</td>
-                            <td class="num">{{ $row['total'] }}</td>
+                            <td>
+                                <b>{{ $row['name'] ?? 'Chưa rõ tên' }}</b>
+                                @if ($row['card']?->tier)
+                                    <span class="pill">{{ $row['card']->tier }}</span>
+                                @endif
+                            </td>
+                            <td>{{ $row['phone'] }}</td>
+                            <td class="num">{{ $row['visits'] }}</td>
+                            <td class="num">{{ $row['bookings'] }}</td>
                             <td class="small muted">
-                                {{ $row['last']->booking_date->format('d/m/Y') }} ·
-                                {{ $row['last']->branch->name }} ·
-                                <span class="pill status-{{ $row['last']->status }}">{{ $row['last']->statusLabel() }}</span>
+                                @if ($row['last'])
+                                    {{ $row['last']->format('d/m/Y') }}
+                                @elseif ($row['card'])
+                                    Chỉ có trong danh sách khách hàng
+                                @endif
                             </td>
                             <td class="num">
                                 <a class="btn btn-ghost btn-sm"
