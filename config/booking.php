@@ -11,6 +11,18 @@ return [
      */
     'admin_domain' => env('ADMIN_DOMAIN'),
 
+    /*
+     * Dong bo hoa don thang tu Sapo FnB (xem SapoDongBoService).
+     * sapo_token: ma bi mat trinh duyet gui kem; de trong = tat cong.
+     * sapo_stores: "id_cua_hang_sapo:slug_dia_diem,..."; cua hang khong khai
+     * thi doi chieu theo ten dia diem.
+     */
+    'sapo_token' => env('SAPO_DONG_BO_TOKEN', ''),
+    'sapo_stores' => collect(explode(',', (string) env('SAPO_STORES', '')))
+        ->map(fn ($cap) => array_map('trim', explode(':', $cap, 2)))
+        ->filter(fn ($cap) => count($cap) === 2 && $cap[0] !== '' && $cap[1] !== '')
+        ->mapWithKeys(fn ($cap) => [$cap[0] => $cap[1]])
+        ->all(),
 
     /*
     |--------------------------------------------------------------------------
