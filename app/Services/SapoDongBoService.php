@@ -143,7 +143,7 @@ class SapoDongBoService
             'ordered_at' => $this->ngay($don['order_time'] ?? $don['created_on'] ?? null),
             'paid_at' => $this->ngay($gioTra ?? $don['created_on'] ?? null),
             'subtotal' => (float) ($don['total_item_price'] ?? 0),
-            'vat' => $this->tong($don['taxes'] ?? [], ['tax_value', 'money', 'value', 'amount']),
+            'vat' => $this->tong($don['taxes'] ?? [], ['taxed_value', 'tax_value', 'money', 'value', 'amount']),
             'service_fee' => $this->tong($don['service_fees'] ?? [], ['fee_value', 'money', 'value', 'amount']),
             'discount' => (float) ($don['total_discount'] ?? 0),
             'delivery_fee' => 0.0,

@@ -115,6 +115,21 @@ class SapoDongBoTest extends TestCase
         $this->assertSame('VIP', $the->tier);
     }
 
+    public function test_thue_cong_ca_vat_lan_thue_dich_vu(): void
+    {
+        // Don that cua Drinking & Healing: 3.177.000 - 587.000 + 129.500 + 253.840 + 10.360.
+        $this->gui([$this->don([
+            'total_item_price' => 3177000, 'total_discount' => 587000, 'total_price' => 2983700,
+            'service_fees' => [['fee_value' => 129500, 'tax' => 8]],
+            'taxes' => [
+                ['name' => 'Thuế VAT', 'percentage' => 10, 'taxed_value' => 253840],
+                ['name' => 'Thuế dịch vụ', 'percentage' => 8, 'taxed_value' => 10360],
+            ],
+        ])])->assertOk();
+
+        $this->assertEquals(264200, Invoice::first()->vat);
+    }
+
     public function test_gui_lai_khong_sinh_ban_trung(): void
     {
         $this->gui([$this->don()]);
