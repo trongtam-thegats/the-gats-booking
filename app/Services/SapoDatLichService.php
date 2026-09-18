@@ -286,8 +286,12 @@ class SapoDatLichService
             $phan[] = 'Khu: '.$booking->area->name;
         }
 
-        if ($booking->diningTables->isNotEmpty()) {
-            $phan[] = 'Bàn: '.$booking->diningTables->pluck('name')->implode(', ');
+        // Ban chi co cot "code" (B3, Bar 1...), KHONG co cot "name" - lay nham
+        // thi ghi chu gui sang Sapo thanh "Ban: ,". Da dinh mot lan 18/09.
+        $ban = $booking->diningTables->pluck('code')->filter()->implode(', ');
+
+        if ($ban !== '') {
+            $phan[] = 'Bàn: '.$ban;
         }
 
         if (filled($booking->note)) {

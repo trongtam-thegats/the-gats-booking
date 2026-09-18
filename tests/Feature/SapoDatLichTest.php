@@ -40,7 +40,7 @@ class SapoDatLichTest extends TestCase
         ]);
 
         $this->branch->diningTables()->create([
-            'code' => 'H8', 'name' => 'Bàn H8', 'seats_min' => 2, 'seats_max' => 6, 'is_active' => true,
+            'code' => 'Bàn H8', 'seats_min' => 2, 'seats_max' => 6, 'is_active' => true,
         ]);
 
         config([
@@ -131,8 +131,9 @@ class SapoDatLichTest extends TestCase
     {
         $this->traLoiOk('TB0001');
         $don = $this->don(['note' => 'Ngồi gần cửa sổ']);
+        $don->diningTables()->sync($this->branch->diningTables()->pluck('id'));
 
-        $this->assertTrue(app(SapoDatLichService::class)->day($don));
+        $this->assertTrue(app(SapoDatLichService::class)->day($don->refresh()));
 
         Http::assertSent(function ($request) use ($don) {
             $g = $request->data();
@@ -145,6 +146,7 @@ class SapoDatLichTest extends TestCase
                 && $g['receptionTime'] === $don->startsAt()->getTimestamp()
                 && str_contains($g['note'], $don->code)
                 && str_contains($g['note'], 'Ngồi gần cửa sổ')
+                && str_contains($g['note'], 'Bàn: Bàn H8')
                 && $g['type'] === 'website';
         });
 
