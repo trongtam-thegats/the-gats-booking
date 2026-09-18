@@ -49,6 +49,7 @@ class Booking extends Model
             'cancelled_at' => 'datetime',
             'seated_at' => 'datetime',
             'completed_at' => 'datetime',
+            'sapo_pushed_at' => 'datetime',
         ];
     }
 

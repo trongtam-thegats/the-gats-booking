@@ -277,6 +277,29 @@ class SapoDatLichTest extends TestCase
         $this->assertStringContainsString('TB0003', (string) $don->sapo_can_xu_ly);
     }
 
+    /**
+     * Trang chi tiet don phai mo duoc sau khi day sang Sapo.
+     *
+     * Da vo 500 tren may that 18/09: cot sapo_pushed_at chua khai kieu ngay gio
+     * nen Blade goi ->format() tren mot chuoi. Test nay chan tai pham.
+     */
+    public function test_trang_chi_tiet_mo_duoc_sau_khi_day(): void
+    {
+        $this->traLoiOk('TB0010');
+        $don = $this->don();
+        app(SapoDatLichService::class)->day($don);
+
+        $nhanVien = User::create([
+            'name' => 'Quản trị', 'email' => 'admin3@thegats.vn', 'password' => 'matkhau123',
+            'role' => Roles::ADMIN, 'is_active' => true,
+        ]);
+
+        $this->actingAs($nhanVien)
+            ->get(route('admin.bookings.show', $don))
+            ->assertOk()
+            ->assertSee('TB0010');
+    }
+
     public function test_nhan_vien_bo_duoc_nhac_viec(): void
     {
         $this->traLoiOk();
