@@ -16,7 +16,9 @@ use Illuminate\Console\Command;
  */
 class DayDatLichSangSapo extends Command
 {
-    protected $signature = 'sapo:day-dat-lich {--gioi-han=50 : So don toi da moi lan chay}';
+    protected $signature = 'sapo:day-dat-lich
+        {--gioi-han=50 : So don toi da moi lan chay}
+        {--xem : Chi liet ke nhung don se day, khong gui gi sang Sapo}';
 
     protected $description = 'Day cac don dat ban da xac nhan sang trang dat lich Sapo';
 
@@ -31,7 +33,9 @@ class DayDatLichSangSapo extends Command
         $don = Booking::query()
             ->where('status', Booking::STATUS_CONFIRMED)
             ->whereNull('sapo_code')
-            ->where('booking_date', '>=', now()->subDay()->toDateString())
+            // Chi don tu HOM NAY tro di - don cua dem truoc khong con y nghia
+            // ben Sapo nua (nguoi dung chot 18/09/2026).
+            ->where('booking_date', '>=', now()->toDateString())
             ->when($sapo->tuLuc(), fn ($q, $moc) => $q->where(
                 fn ($c) => $c->whereNull('confirmed_at')->orWhere('confirmed_at', '>=', $moc)
             ))
@@ -39,6 +43,25 @@ class DayDatLichSangSapo extends Command
             ->orderBy('booking_date')
             ->limit((int) $this->option('gioi-han'))
             ->get();
+
+        if ($this->option('xem')) {
+            $this->info($don->count().' đơn đang chờ đẩy sang Sapo:');
+
+            foreach ($don as $mot) {
+                $vuong = $sapo->vuongMac($mot);
+
+                $this->line(sprintf(
+                    '%-10s %-18s %s %s  %s',
+                    $mot->code,
+                    $mot->branch?->name,
+                    $mot->booking_date->format('d/m'),
+                    substr((string) $mot->start_time, 0, 5),
+                    $vuong === null ? 'sẵn sàng' : 'vướng: '.$vuong
+                ));
+            }
+
+            return self::SUCCESS;
+        }
 
         $xong = 0;
 

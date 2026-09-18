@@ -214,6 +214,30 @@ class SapoDatLichTest extends TestCase
         $this->assertSame('TB0009', $don->refresh()->sapo_code);
     }
 
+    public function test_lenh_bo_qua_don_cua_nhung_ngay_da_qua(): void
+    {
+        $this->traLoiOk();
+        $homQua = $this->don(['booking_date' => today()->subDay()->toDateString()]);
+
+        $this->artisan('sapo:day-dat-lich')->assertSuccessful();
+
+        $this->assertSame(0, $this->soLanGuiDon());
+        $this->assertNull($homQua->refresh()->sapo_code);
+    }
+
+    public function test_xem_truoc_thi_khong_gui_gi_sang_sapo(): void
+    {
+        $this->traLoiOk();
+        $don = $this->don();
+
+        $this->artisan('sapo:day-dat-lich --xem')
+            ->expectsOutputToContain('1 đơn đang chờ đẩy sang Sapo')
+            ->assertSuccessful();
+
+        $this->assertSame(0, $this->soLanGuiDon());
+        $this->assertNull($don->refresh()->sapo_code);
+    }
+
     public function test_huy_don_da_day_thi_bat_co_xu_ly_tay(): void
     {
         $this->traLoiOk('TB0002');
