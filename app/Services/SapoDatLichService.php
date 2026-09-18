@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Booking;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -89,17 +90,85 @@ class SapoDatLichService
             return 'Giờ khách đến đã qua';
         }
 
-        // Sapo tu choi don dat sat gio (mac dinh 2 tieng) va don qua xa
-        // (mac dinh 30 ngay). Day vao chi to nhan mot loi kho hieu.
-        $som = (int) config('booking.sapo_dat_lich.som_nhat_gio');
+        // Sapo tu choi don dat sat gio va don qua xa. Hai muc nay quan tu doi
+        // duoc trong Sapo (da doi tu 2 tieng xuong 30 phut ngay 18/09), nen doc
+        // thang tu Sapo chu khong chep lai vao .env cho lech nhau.
+        $quy = $this->quyDinh((int) $this->storeId($booking));
 
         // Carbon 3 tra so THUC va co dau cho diffInMinutes - so sanh thang la
         // sai dau. Lay hieu timestamp cho chac.
-        if ($som > 0 && $gio->getTimestamp() - now()->getTimestamp() < $som * 3600) {
-            return 'Sapo chỉ nhận đơn đặt trước ít nhất '.$som.' tiếng';
+        $conLai = (int) floor(($gio->getTimestamp() - now()->getTimestamp()) / 60);
+
+        if ($quy['som_nhat_phut'] > 0 && $conLai < $quy['som_nhat_phut']) {
+            return 'Sapo chỉ nhận đơn đặt trước ít nhất '.$this->doDai($quy['som_nhat_phut']);
+        }
+
+        if ($quy['xa_nhat_ngay'] > 0 && $conLai > $quy['xa_nhat_ngay'] * 24 * 60) {
+            return 'Sapo chỉ nhận đơn trong vòng '.$quy['xa_nhat_ngay'].' ngày';
         }
 
         return null;
+    }
+
+    /**
+     * Quy dinh nhan don cua mot cua hang, doc tu chinh Sapo (nho 1 tieng).
+     *
+     * Goi hong thi dung muc trong .env - khong chan viec day don chi vi khong
+     * hoi duoc cau hinh.
+     *
+     * @return array{som_nhat_phut: int, xa_nhat_ngay: int}
+     */
+    public function quyDinh(int $storeId): array
+    {
+        $macDinh = [
+            'som_nhat_phut' => (int) config('booking.sapo_dat_lich.som_nhat_phut'),
+            'xa_nhat_ngay' => (int) config('booking.sapo_dat_lich.xa_nhat_ngay'),
+        ];
+
+        return Cache::remember('sapo.quy-dinh.'.$storeId, now()->addHour(), function () use ($storeId, $macDinh) {
+            try {
+                $tra = Http::timeout((int) config('booking.sapo_dat_lich.timeout'))
+                    ->acceptJson()
+                    ->get(rtrim((string) config('booking.sapo_dat_lich.url'), '/').'/api/booking/merchant-info', [
+                        'merchantId' => (int) config('booking.sapo_dat_lich.merchant_id'),
+                    ]);
+
+                foreach ((array) $tra->json('stores', []) as $cua) {
+                    if ((int) ($cua['id'] ?? 0) !== $storeId) {
+                        continue;
+                    }
+
+                    foreach ((array) ($cua['storeSettings'] ?? []) as $cai) {
+                        if (($cai['settingKey'] ?? '') !== 'features_booking') {
+                            continue;
+                        }
+
+                        $gt = json_decode((string) ($cai['settingValue'] ?? ''), true);
+                        $nhan = $gt['reception_time'] ?? [];
+                        $som = $nhan['min_booking_time'] ?? [];
+
+                        return [
+                            'som_nhat_phut' => match ($som['unit'] ?? '') {
+                                'hour' => (int) ($som['time'] ?? 0) * 60,
+                                'minute' => (int) ($som['time'] ?? 0),
+                                default => $macDinh['som_nhat_phut'],
+                            },
+                            'xa_nhat_ngay' => (int) ($nhan['max_booking_date'] ?? $macDinh['xa_nhat_ngay']),
+                        ];
+                    }
+                }
+            } catch (Throwable $e) {
+                Log::warning('Không đọc được quy định đặt lịch của Sapo', ['loi' => $e->getMessage()]);
+            }
+
+            return $macDinh;
+        });
+    }
+
+    /** 30 -> "30 phút", 120 -> "2 tiếng". */
+    protected function doDai(int $phut): string
+    {
+        return $phut % 60 === 0 ? intdiv($phut, 60).' tiếng' : $phut.' phút';
     }
 
     /**

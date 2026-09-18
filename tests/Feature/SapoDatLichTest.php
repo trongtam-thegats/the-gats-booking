@@ -47,7 +47,8 @@ class SapoDatLichTest extends TestCase
             'booking.sapo_dat_lich.bat' => true,
             'booking.sapo_dat_lich.url' => 'https://dat-lich.test',
             'booking.sapo_dat_lich.merchant_id' => 19579,
-            'booking.sapo_dat_lich.som_nhat_gio' => 2,
+            'booking.sapo_dat_lich.som_nhat_phut' => 30,
+            'booking.sapo_dat_lich.xa_nhat_ngay' => 30,
             'booking.sapo_stores' => ['46101' => 'gemination'],
         ]);
     }
@@ -69,24 +70,61 @@ class SapoDatLichTest extends TestCase
 
     protected function traLoiOk(string $ma = 'TB123'): void
     {
-        Http::fake(['dat-lich.test/*' => Http::response(['tableBooking' => ['code' => $ma]], 200)]);
+        Http::fake([
+            '*merchant-info*' => Http::response($this->quyDinhSapo(), 200),
+            'dat-lich.test/*' => Http::response(['tableBooking' => ['code' => $ma]], 200),
+        ]);
     }
 
     /**
-     * Http::fake goi lan sau KHONG thay the lan truoc - stub cu khop truoc van
-     * thang. Muon hai cau tra loi khac nhau thi phai khai mot day.
+     * Quy dinh nhan don cua Sapo, dang that cua /api/booking/merchant-info.
+     * Chu quan doi duoc muc nay trong Sapo nen he thong doc thang tu do.
+     */
+    /** Dem so lan that su GUI DON sang Sapo, bo qua cac lan hoi quy dinh. */
+    protected function soLanGuiDon(): int
+    {
+        return Http::recorded(fn ($request) => str_contains($request->url(), '/api/booking/submit'))->count();
+    }
+
+    protected function quyDinhSapo(int $somNhatPhut = 30, int $xaNhatNgay = 30): array
+    {
+        return ['stores' => [[
+            'id' => 46101,
+            'name' => 'Gemination Đà Lạt',
+            'storeSettings' => [[
+                'settingKey' => 'features_booking',
+                'settingValue' => json_encode(['reception_time' => [
+                    'min_booking_time' => ['unit' => 'minute', 'time' => $somNhatPhut],
+                    'max_booking_date' => $xaNhatNgay,
+                ]]),
+            ]],
+        ]]];
+    }
+
+    /**
+     * Hai cau tra loi khac nhau cho hai lan gui don.
+     *
+     * Hai bay cua Http::fake, da sap ca hai:
+     *  - goi fake() lan sau KHONG thay the lan truoc, stub cu khop van thang;
+     *  - tron Http::sequence() voi mot stub khac trong cung mot mang thi moi
+     *    yeu cau deu RUT mot cau tra loi khoi day, ke ca yeu cau khop stub kia.
+     * Nen o day dung mot closure duy nhat, tu chia duong.
      *
      * @param  array<int, mixed>  $traLoi
      */
     protected function traLoiLanLuot(array $traLoi): void
     {
-        $day = Http::sequence();
+        $con = $traLoi;
 
-        foreach ($traLoi as $mot) {
-            $day->push(...$mot);
-        }
+        Http::fake(function ($request) use (&$con) {
+            if (str_contains($request->url(), 'merchant-info')) {
+                return Http::response($this->quyDinhSapo(), 200);
+            }
 
-        Http::fake(['dat-lich.test/*' => $day]);
+            $mot = array_shift($con) ?? ['het luot', 500];
+
+            return Http::response(...$mot);
+        });
     }
 
     public function test_day_don_gui_dung_noi_dung_sang_sapo(): void
@@ -125,7 +163,8 @@ class SapoDatLichTest extends TestCase
         $sapo->day($don);
         $this->assertFalse($sapo->day($don->refresh()));
 
-        Http::assertSentCount(1);
+        // Hai yeu cau: mot hoi quy dinh, mot gui don. Lan hai khong goi gi nua.
+        $this->assertSame(1, $this->soLanGuiDon());
     }
 
     public function test_don_sat_gio_va_don_chua_xac_nhan_thi_khong_day(): void
@@ -136,14 +175,16 @@ class SapoDatLichTest extends TestCase
         $this->traLoiOk();
         $sapo = app(SapoDatLichService::class);
 
-        $satGio = $this->don(['booking_date' => today()->toDateString(), 'start_time' => '20:00']);
+        // Sapo dang nhan don truoc 30 phut: 19:10 cho gio den 19:30 la sat qua.
+        $this->travelTo(today()->setTime(19, 10));
+        $satGio = $this->don(['booking_date' => today()->toDateString(), 'start_time' => '19:30']);
         $choDuyet = $this->don(['status' => Booking::STATUS_PENDING]);
 
         $this->assertFalse($sapo->day($satGio));
         $this->assertFalse($sapo->day($choDuyet));
 
-        Http::assertNothingSent();
-        $this->assertStringContainsString('ít nhất 2 tiếng', (string) $satGio->refresh()->sapo_error);
+        $this->assertSame(0, $this->soLanGuiDon());
+        $this->assertStringContainsString('ít nhất 30 phút', (string) $satGio->refresh()->sapo_error);
     }
 
     public function test_sapo_loi_thi_ghi_lai_va_khong_lam_hong_luong_dat_ban(): void
@@ -246,6 +287,42 @@ class SapoDatLichTest extends TestCase
 
         $this->artisan('sapo:day-dat-lich')->assertSuccessful();
         $this->assertNull($cu->refresh()->sapo_code);
+    }
+
+    public function test_doc_quy_dinh_gio_thang_tu_sapo(): void
+    {
+        // Chu quan doi muc nhan don trong Sapo thi he thong theo ngay, khong
+        // phai sua .env: 18/09/2026 da doi tu 2 tieng xuong 30 phut.
+        Http::fake([
+            '*merchant-info*' => Http::response($this->quyDinhSapo(120, 7), 200),
+            'dat-lich.test/*' => Http::response(['tableBooking' => ['code' => 'TB0007']], 200),
+        ]);
+
+        $this->travelTo(today()->setTime(18, 30));
+        $sapo = app(SapoDatLichService::class);
+
+        $this->assertSame(['som_nhat_phut' => 120, 'xa_nhat_ngay' => 7], $sapo->quyDinh(46101));
+
+        $satGio = $this->don(['booking_date' => today()->toDateString(), 'start_time' => '19:30']);
+        $quaXa = $this->don(['booking_date' => today()->addDays(9)->toDateString()]);
+
+        $this->assertFalse($sapo->day($satGio));
+        $this->assertFalse($sapo->day($quaXa));
+        $this->assertStringContainsString('ít nhất 2 tiếng', (string) $satGio->refresh()->sapo_error);
+        $this->assertStringContainsString('trong vòng 7 ngày', (string) $quaXa->refresh()->sapo_error);
+    }
+
+    public function test_hoi_khong_duoc_quy_dinh_thi_dung_muc_du_phong(): void
+    {
+        Http::fake([
+            '*merchant-info*' => Http::response('sap', 500),
+            'dat-lich.test/*' => Http::response(['tableBooking' => ['code' => 'TB0008']], 200),
+        ]);
+
+        $sapo = app(SapoDatLichService::class);
+
+        $this->assertSame(['som_nhat_phut' => 30, 'xa_nhat_ngay' => 30], $sapo->quyDinh(46101));
+        $this->assertTrue($sapo->day($this->don()));
     }
 
     public function test_tat_cong_thi_khong_goi_sapo(): void

@@ -20,13 +20,15 @@ return [
     /*
      * Day don dat ban da xac nhan sang trang dat lich cua Sapo FnB.
      * url: ten mien trang dat lich cua chuoi (co ma alias trong duong dan).
-     * som_nhat_gio: Sapo tu choi don dat sat gio, mac dinh 2 tieng.
+     * som_nhat_phut / xa_nhat_ngay: muc du phong khi khong hoi duoc Sapo.
      */
     'sapo_dat_lich' => [
         'bat' => (bool) env('SAPO_DAT_LICH', false),
         'url' => env('SAPO_DAT_LICH_URL', ''),
         'merchant_id' => env('SAPO_MERCHANT_ID', ''),
-        'som_nhat_gio' => (int) env('SAPO_DAT_LICH_SOM_NHAT_GIO', 2),
+        // Chi dung khi khong hoi duoc Sapo; muc that doc tu /api/booking/merchant-info.
+        'som_nhat_phut' => (int) env('SAPO_DAT_LICH_SOM_NHAT_PHUT', 30),
+        'xa_nhat_ngay' => (int) env('SAPO_DAT_LICH_XA_NHAT_NGAY', 30),
         // Chi day don duoc xac nhan tu moc nay tro di. Bat tinh nang len ma
         // khong co moc thi toan bo don cu con hieu luc se do sang Sapo mot luc.
         'tu_luc' => env('SAPO_DAT_LICH_TU_LUC', ''),
