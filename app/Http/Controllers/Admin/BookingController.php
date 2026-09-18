@@ -9,6 +9,7 @@ use App\Models\Branch;
 use App\Services\AvailabilityService;
 use App\Services\BookingService;
 use App\Services\GuestProfileService;
+use App\Services\SapoDatLichService;
 use App\Support\NguonDatBan;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -289,5 +290,21 @@ class BookingController extends AdminController
         $booking->update($data);
 
         return back()->with('status', 'Đã lưu ghi chú nội bộ.');
+    }
+
+    /**
+     * Nhan vien bao da vao Sapo huy hoac sua don do tay.
+     *
+     * Sapo khong mo duong huy/sua cho ben ngoai, nen he thong chi bat co nhac
+     * viec; go co la viec cua nguoi that.
+     */
+    public function sapoDaXuLy(Request $request, Booking $booking, SapoDatLichService $sapo)
+    {
+        $this->authorizeBranch($request, $booking->branch_id);
+        abort_unless($request->user()->canWrite(), 403);
+
+        $sapo->daXuLy($booking);
+
+        return back()->with('status', 'Đã bỏ nhắc việc bên Sapo.');
     }
 }

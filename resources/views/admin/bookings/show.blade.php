@@ -227,6 +227,27 @@
     </div>
 
     <div class="card">
+        <h2>Đặt lịch bên Sapo</h2>
+        @if ($booking->sapo_can_xu_ly)
+            <p class="alert alert-error">{{ $booking->sapo_can_xu_ly }}</p>
+            @if (auth()->user()->canWrite())
+                <form method="post" action="{{ route('admin.bookings.sapo-da-xu-ly', $booking) }}">
+                    @csrf
+                    <button class="btn btn-sm" type="submit">Tôi đã xử lý bên Sapo</button>
+                </form>
+            @endif
+        @elseif ($booking->sapo_code)
+            <p class="hint">Đã đẩy sang Sapo · mã <b>{{ $booking->sapo_code }}</b>
+                · {{ $booking->sapo_pushed_at?->format('H:i d/m/Y') }}</p>
+        @elseif ($booking->sapo_error)
+            <p class="hint">Chưa đẩy được: {{ $booking->sapo_error }}.
+                Hệ thống tự thử lại mỗi 5 phút cho tới khi Sapo nhận.</p>
+        @else
+            <p class="hint">Chưa đẩy. Đơn được đẩy sang Sapo ngay khi xác nhận.</p>
+        @endif
+    </div>
+
+    <div class="card">
         <h2>Nhật ký gửi thông báo</h2>
         <p class="sub">Ghi lại từng lần hệ thống nhắn cho khách, kể cả khi kênh chưa được cấu hình.</p>
         <div class="table-wrap">

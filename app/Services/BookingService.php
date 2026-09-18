@@ -20,6 +20,7 @@ class BookingService
     public function __construct(
         protected AvailabilityService $availability,
         protected BookingNotifier $notifier,
+        protected SapoDatLichService $sapo,
     ) {}
 
     /**
@@ -121,6 +122,10 @@ class BookingService
 
         $booking->load(['branch', 'diningTables', 'area']);
         $this->notifier->send($booking, $booking->status === Booking::STATUS_CONFIRMED ? 'confirmed' : 'created');
+
+        if ($booking->status === Booking::STATUS_CONFIRMED) {
+            $this->sapo->day($booking);
+        }
 
         return $booking;
     }
@@ -308,7 +313,11 @@ class BookingService
             $booking->diningTables()->sync($tableIds);
         });
 
-        $booking->refresh()->load(['branch', 'diningTables']);
+        $booking->refresh()->load(['branch', 'diningTables', 'area']);
+
+        // Sapo khong cho sua don da gui: don cu phai huy tay ben do, don moi
+        // day lai tu dau.
+        $this->sapo->doiLich($booking);
 
         if ($notify) {
             $this->notifier->send($booking, 'updated');
@@ -396,7 +405,10 @@ class BookingService
             ]);
         });
 
-        $this->notifier->send($booking->fresh(['branch', 'diningTables']), 'confirmed');
+        $tuoi = $booking->fresh(['branch', 'diningTables', 'area']);
+
+        $this->notifier->send($tuoi, 'confirmed');
+        $this->sapo->day($tuoi);
 
         return $booking;
     }
@@ -412,6 +424,8 @@ class BookingService
 
         // Nha ban ra cho khach khac.
         $booking->diningTables()->detach();
+
+        $this->sapo->canXuLyTay($booking, 'Đơn đã huỷ sau khi đẩy sang Sapo. Vào Sapo huỷ đơn đó.');
 
         $this->notifier->send($booking->fresh(['branch', 'diningTables']), 'cancelled');
 

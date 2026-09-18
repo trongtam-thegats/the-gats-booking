@@ -17,6 +17,22 @@ return [
      * sapo_stores: "id_cua_hang_sapo:slug_dia_diem,..."; cua hang khong khai
      * thi doi chieu theo ten dia diem.
      */
+    /*
+     * Day don dat ban da xac nhan sang trang dat lich cua Sapo FnB.
+     * url: ten mien trang dat lich cua chuoi (co ma alias trong duong dan).
+     * som_nhat_gio: Sapo tu choi don dat sat gio, mac dinh 2 tieng.
+     */
+    'sapo_dat_lich' => [
+        'bat' => (bool) env('SAPO_DAT_LICH', false),
+        'url' => env('SAPO_DAT_LICH_URL', ''),
+        'merchant_id' => env('SAPO_MERCHANT_ID', ''),
+        'som_nhat_gio' => (int) env('SAPO_DAT_LICH_SOM_NHAT_GIO', 2),
+        // Chi day don duoc xac nhan tu moc nay tro di. Bat tinh nang len ma
+        // khong co moc thi toan bo don cu con hieu luc se do sang Sapo mot luc.
+        'tu_luc' => env('SAPO_DAT_LICH_TU_LUC', ''),
+        'timeout' => (int) env('SAPO_DAT_LICH_TIMEOUT', 10),
+    ],
+
     'sapo_token' => env('SAPO_DONG_BO_TOKEN', ''),
     'sapo_stores' => collect(explode(',', (string) env('SAPO_STORES', '')))
         ->map(fn ($cap) => array_map('trim', explode(':', $cap, 2)))

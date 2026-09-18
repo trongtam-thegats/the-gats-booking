@@ -70,6 +70,8 @@ Route::prefix('quan-ly')->name('admin.')->middleware('admin.site')->group(functi
             Route::post('dat-ban/{booking}/trang-thai/{action}', [AdminBookingController::class, 'transition'])->name('bookings.transition');
             Route::post('dat-ban/{booking}/ban', [AdminBookingController::class, 'assignTables'])->name('bookings.tables');
             Route::post('dat-ban/{booking}/ghi-chu', [AdminBookingController::class, 'updateNote'])->name('bookings.note');
+            Route::post('dat-ban/{booking}/sapo-da-xu-ly', [AdminBookingController::class, 'sapoDaXuLy'])
+                ->name('bookings.sapo-da-xu-ly');
             Route::post('dat-ban/{booking}/doi-lich', [AdminBookingController::class, 'reschedule'])->name('bookings.reschedule');
             Route::post('khach/ghi-chu', [GuestController::class, 'saveNote'])->name('guests.note');
 
