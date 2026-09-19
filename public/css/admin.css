@@ -426,13 +426,99 @@ details.card[open] > summary { margin-bottom: 12px; }
 .login-card { width: min(100%, 380px); }
 .login-card .side-brand { justify-content: center; border: none; margin-bottom: 8px; }
 
+/* Tren may tinh: thanh ben luon mo, khong co nut Menu. */
+.side-top { display: contents; }
+.side-dang-xem, .menu-nut { display: none; }
+.side-nav { display: flex; flex-direction: column; gap: 4px; }
+
 @media (max-width: 860px) {
+    /* Tren dien thoai menu gap lai sau mot cu bam. Truoc day 20 muc trai het
+       ra man hinh, phai cuon qua ca rung chu moi thay noi dung trang. */
     .shell { flex-direction: column; }
-    .side { width: 100%; flex: none; flex-direction: row; flex-wrap: wrap; align-items: center; padding: 12px; }
-    .side-brand { border: none; margin: 0 12px 0 0; padding: 0; }
-    .nav-group { display: none; }
-    .side-foot { margin: 0 0 0 auto; border: none; padding: 0; }
-    .side-user { display: none; }
+
+    .side {
+        width: 100%;
+        flex: none;
+        padding: 10px 14px;
+        gap: 0;
+        position: sticky;
+        top: 0;
+        z-index: 20;
+        border-right: none;
+        border-bottom: 1px solid var(--line);
+    }
+
+    .side-top {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+
+    .side-brand { border: none; margin: 0; padding: 0; }
+    .side-brand span span { display: none; }
+
+    /* Ten trang dang xem, de biet minh dang o dau khi menu dang dong. */
+    .side-dang-xem {
+        display: block;
+        flex: 1;
+        min-width: 0;
+        font-size: 13px;
+        color: var(--muted);
+        text-align: right;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+    }
+
+    .menu-nut {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 9px 14px;
+        border: 1px solid color-mix(in srgb, var(--gold) 40%, transparent);
+        border-radius: 8px;
+        color: var(--gold-soft);
+        font-size: 14px;
+        cursor: pointer;
+        user-select: none;
+    }
+
+    /* Ba gach ngang cua nut menu, ve bang chinh vien cua o. */
+    .menu-gach, .menu-gach::before, .menu-gach::after {
+        display: block;
+        width: 16px;
+        height: 2px;
+        background: currentColor;
+        border-radius: 2px;
+    }
+
+    .menu-gach { position: relative; }
+    .menu-gach::before, .menu-gach::after { content: ''; position: absolute; left: 0; }
+    .menu-gach::before { top: -5px; }
+    .menu-gach::after { top: 5px; }
+
+    .side-nav, .side-foot { display: none; }
+
+    .menu-o:checked ~ .side-nav {
+        display: block;
+        margin-top: 12px;
+        max-height: 60vh;
+        overflow-y: auto;
+        border-top: 1px solid var(--line);
+        padding-top: 10px;
+    }
+
+    .menu-o:checked ~ .side-foot {
+        display: block;
+        margin: 10px 0 4px;
+        border-top: 1px solid var(--line);
+        padding-top: 10px;
+    }
+
+    /* Ngon tay to hon con tro chuot: moi muc cao hon tren dien thoai. */
+    .nav-link { padding: 12px; font-size: 15px; }
+    .nav-group { padding: 14px 12px 4px; }
+    .side-user { display: block; }
     .main { padding: 18px 14px 48px; }
 }
 

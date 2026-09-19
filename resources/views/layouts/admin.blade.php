@@ -19,14 +19,29 @@
 @php($user = auth()->user())
 <div class="shell">
     <aside class="side">
-        <a href="{{ route('admin.dashboard') }}" class="side-brand">
-            <span class="side-mark">TG</span>
-            <span>
-                <b>The Gats</b>
-                <span>Đặt bàn</span>
-            </span>
-        </a>
+        {{-- O tich an la cong tac dong/mo menu tren dien thoai: khong can mot
+             dong JS nao, va bam sang trang khac la tu dong dong lai. Phai dat
+             TRUOC .side-nav de CSS dung duoc bo chon "~". --}}
+        <input type="checkbox" id="mo-menu" class="menu-o" hidden>
 
+        <div class="side-top">
+            <a href="{{ route('admin.dashboard') }}" class="side-brand">
+                <span class="side-mark">TG</span>
+                <span>
+                    <b>The Gats</b>
+                    <span>Đặt bàn</span>
+                </span>
+            </a>
+
+            <span class="side-dang-xem">@yield('title', 'Quản lý')</span>
+
+            <label class="menu-nut" for="mo-menu">
+                <span class="menu-gach" aria-hidden="true"></span>
+                Menu
+            </label>
+        </div>
+
+        <nav class="side-nav">
         <a class="nav-link {{ request()->routeIs('admin.dashboard') ? 'active' : '' }}"
            href="{{ route('admin.dashboard') }}">Tổng quan hôm nay</a>
         <a class="nav-link {{ request()->routeIs('admin.floor') ? 'active' : '' }}"
@@ -68,6 +83,8 @@
             <a class="nav-link {{ request()->routeIs('admin.bookings.deletions') ? 'active' : '' }}"
                href="{{ route('admin.bookings.deletions') }}">Nhật ký xóa</a>
         @endif
+
+        </nav>
 
         <div class="side-foot">
             <div class="side-user">
