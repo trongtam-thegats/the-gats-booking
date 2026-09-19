@@ -23,6 +23,8 @@
         <env name="BCRYPT_ROUNDS" value="4"/>
         <env name="BROADCAST_CONNECTION" value="null"/>
         <env name="CACHE_STORE" value="array"/>
+        <!-- Windows: OpenSSL khong tu tim thay openssl.cnf, thieu la moi loi deu bao "No such process". -->
+        <env name="OPENSSL_CNF" value="C:/PHP/extras/ssl/openssl.cnf"/>
         <!--
             Chay test tren MySQL thay vi SQLite: chinh sach Application Control cua
             Windows tren may nay dang chan php_pdo_sqlite.dll. Can co san CSDL

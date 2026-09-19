@@ -303,7 +303,15 @@ class SapoDatLichService
 
     protected function ghiLoi(Booking $booking, string $loi): bool
     {
+        // Chi bao mot lan cho moi don: lenh cron chay lai moi 5 phut, bao moi
+        // lan la dien thoai nhan vien keu suot dem.
+        $lanDau = $booking->sapo_error === null;
+
         $booking->forceFill(['sapo_error' => mb_substr($loi, 0, 255)])->saveQuietly();
+
+        if ($lanDau) {
+            app(ThongBaoDayService::class)->sapoHong($booking->loadMissing('branch'), $loi);
+        }
 
         Log::warning('Đẩy đơn sang Sapo không thành công', ['booking' => $booking->code, 'loi' => $loi]);
 

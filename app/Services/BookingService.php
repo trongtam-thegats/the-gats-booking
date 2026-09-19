@@ -21,6 +21,7 @@ class BookingService
         protected AvailabilityService $availability,
         protected BookingNotifier $notifier,
         protected SapoDatLichService $sapo,
+        protected ThongBaoDayService $thongBao,
     ) {}
 
     /**
@@ -126,6 +127,9 @@ class BookingService
         if ($booking->status === Booking::STATUS_CONFIRMED) {
             $this->sapo->day($booking);
         }
+
+        // Bao cho nhan vien tren dien thoai. $actor === null nghia la khach tu dat.
+        $this->thongBao->donMoi($booking->load('branch'), $actor !== null);
 
         return $booking;
     }
@@ -426,6 +430,11 @@ class BookingService
         $booking->diningTables()->detach();
 
         $this->sapo->canXuLyTay($booking, 'Đơn đã huỷ sau khi đẩy sang Sapo. Vào Sapo huỷ đơn đó.');
+
+        // Nhan vien can biet ngay khi KHACH tu huy; don do chinh ho huy thi thoi.
+        if ($byType === 'customer') {
+            $this->thongBao->khachHuy($booking->fresh('branch'));
+        }
 
         $this->notifier->send($booking->fresh(['branch', 'diningTables']), 'cancelled');
 

@@ -8,6 +8,12 @@
          tran nen trinh duyet giu mai ban CSS cu - doi giao dien xong ma nhan
          vien van thay ban cu. --}}
     <link rel="stylesheet" href="{{ \App\Support\Assets::url('css/admin.css') }}">
+    {{-- Them vao Man hinh chinh: bat buoc de iPhone nhan duoc thong bao day. --}}
+    <link rel="manifest" href="/manifest.webmanifest">
+    <link rel="apple-touch-icon" href="/brand/icon-192.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-title" content="The Gats">
+    <meta name="theme-color" content="#14110f">
 </head>
 <body>
 @php($user = auth()->user())
@@ -68,6 +74,8 @@
                 <b>{{ $user->name }}</b>
                 <span>{{ $user->roleLabel() }}@if ($user->branch) · {{ $user->branch->name }} @endif</span>
             </div>
+            <a class="nav-link {{ request()->routeIs('admin.thong-bao.*') ? 'active' : '' }}"
+               href="{{ route('admin.thong-bao.index') }}">Thông báo</a>
             <a class="nav-link {{ request()->routeIs('admin.password.*') ? 'active' : '' }}"
                href="{{ route('admin.password.edit') }}">Đổi mật khẩu</a>
             <form method="post" action="{{ route('admin.logout') }}">

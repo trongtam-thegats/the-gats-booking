@@ -35,6 +35,18 @@ return [
         'timeout' => (int) env('SAPO_DAT_LICH_TIMEOUT', 10),
     ],
 
+    /*
+     * Thong bao day (Web Push) cho nhan vien.
+     * Sinh cap khoa mot lan bang lenh: php artisan push:khoa-moi
+     */
+    'push' => [
+        'public_key' => env('VAPID_PUBLIC_KEY', ''),
+        'private_key' => env('VAPID_PRIVATE_KEY', ''),
+        'subject' => env('VAPID_SUBJECT', 'mailto:datban@thegats.vn'),
+        // Chi may Windows moi can: duong dan toi openssl.cnf.
+        'openssl_cnf' => env('OPENSSL_CNF', ''),
+    ],
+
     'sapo_token' => env('SAPO_DONG_BO_TOKEN', ''),
     'sapo_stores' => collect(explode(',', (string) env('SAPO_STORES', '')))
         ->map(fn ($cap) => array_map('trim', explode(':', $cap, 2)))

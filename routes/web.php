@@ -14,6 +14,7 @@ use App\Http\Controllers\Admin\InvoiceController;
 use App\Http\Controllers\Admin\PasswordController;
 use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\SettingController;
+use App\Http\Controllers\Admin\ThongBaoController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\PublicBookingController;
 use Illuminate\Support\Facades\Route;
@@ -44,6 +45,11 @@ Route::prefix('quan-ly')->name('admin.')->middleware('admin.site')->group(functi
         // Xem lich dat ban - moi vai tro deu vao duoc, ke ca vai chi xem
         Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
         Route::get('so-do-ban', [FloorController::class, 'index'])->name('floor');
+        Route::get('thong-bao', [ThongBaoController::class, 'index'])->name('thong-bao.index');
+        Route::post('thong-bao/dang-ky', [ThongBaoController::class, 'dangKy'])->name('thong-bao.dang-ky');
+        Route::post('thong-bao/huy', [ThongBaoController::class, 'huy'])->name('thong-bao.huy');
+        Route::post('thong-bao/gui-thu', [ThongBaoController::class, 'guiThu'])->name('thong-bao.gui-thu');
+
         Route::get('dat-ban', [AdminBookingController::class, 'index'])->name('bookings.index');
         Route::get('dat-ban/{booking}', [AdminBookingController::class, 'show'])
             ->where('booking', '[A-Za-z0-9]+')->name('bookings.show');
