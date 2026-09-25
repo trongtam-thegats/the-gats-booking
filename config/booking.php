@@ -67,7 +67,7 @@ return [
             ->mapWithKeys(fn ($cap) => [$cap[0] => $cap[1]])
             ->all()
         ),
-        'timeout' => (int) env('ZALO_GROUP_TIMEOUT', 10),
+        'timeout' => (int) env('ZALO_GROUP_TIMEOUT', 20),
     ],
 
     'sapo_token' => env('SAPO_DONG_BO_TOKEN', ''),
