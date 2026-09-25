@@ -4,6 +4,7 @@ namespace App\Services;
 
 use App\Models\Booking;
 use App\Models\Branch;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Throwable;
@@ -55,9 +56,25 @@ class ZaloNhomService
             return false;
         }
 
-        $noiDung = $this->soanTinDonMoi($booking, $nhanVienDat);
+        // Chống gửi trùng lặp (Idempotency Lock) trong vòng 10 phút
+        $khoaKey = "zalo_gui:don_moi:{$booking->code}";
+        if (! Cache::add($khoaKey, true, now()->addMinutes(10))) {
+            Log::info('Bo qua gui Zalo: don dat ban da duoc gui truoc do', [
+                'booking' => $booking->code,
+                'event' => 'don_moi',
+            ]);
 
-        return $this->guiTin($tenNhom, $noiDung, ['booking' => $booking->code, 'event' => 'don_moi']);
+            return true;
+        }
+
+        $noiDung = $this->soanTinDonMoi($booking, $nhanVienDat);
+        $thanhCong = $this->guiTin($tenNhom, $noiDung, ['booking' => $booking->code, 'event' => 'don_moi']);
+
+        if (! $thanhCong) {
+            Cache::forget($khoaKey);
+        }
+
+        return $thanhCong;
     }
 
     /** Gui thong bao khi khach tu bam huy don tren trang tra cuu. */
@@ -74,9 +91,25 @@ class ZaloNhomService
             return false;
         }
 
-        $noiDung = $this->soanTinKhachHuy($booking);
+        // Chống gửi trùng lặp thông báo hủy trong vòng 10 phút
+        $khoaKey = "zalo_gui:khach_huy:{$booking->code}";
+        if (! Cache::add($khoaKey, true, now()->addMinutes(10))) {
+            Log::info('Bo qua gui Zalo: thong bao khach huy da duoc gui truoc do', [
+                'booking' => $booking->code,
+                'event' => 'khach_huy',
+            ]);
 
-        return $this->guiTin($tenNhom, $noiDung, ['booking' => $booking->code, 'event' => 'khach_huy']);
+            return true;
+        }
+
+        $noiDung = $this->soanTinKhachHuy($booking);
+        $thanhCong = $this->guiTin($tenNhom, $noiDung, ['booking' => $booking->code, 'event' => 'khach_huy']);
+
+        if (! $thanhCong) {
+            Cache::forget($khoaKey);
+        }
+
+        return $thanhCong;
     }
 
     /**

@@ -185,4 +185,29 @@ class ZaloNhomTest extends TestCase
 
         Http::assertNothingSent();
     }
+
+    public function test_chong_gui_trung_lap_khi_goi_nhieu_lan(): void
+    {
+        Http::fake([
+            'https://zalo.thegats.vn/api/v1/zalo/send-message' => Http::response(['success' => true], 200),
+        ]);
+
+        $booking = app(BookingService::class)->create($this->drinkingHealing, [
+            'customer_name' => 'Khách Gọi Hai Lần',
+            'customer_phone' => '0911223344',
+            'party_size' => 2,
+            'booking_date' => now()->addDay()->format('Y-m-d'),
+            'start_time' => '19:00',
+        ]);
+
+        // Đã gửi 1 lần khi create()
+        Http::assertSentCount(1);
+
+        // Thử gọi lại guiDonMoi thủ công lần thứ 2 cho cùng booking
+        $daGui = app(\App\Services\ZaloNhomService::class)->guiDonMoi($booking);
+
+        $this->assertTrue($daGui);
+        // Số request ra ngoài mạng vẫn phải là 1 (không bị gửi lần 2)
+        Http::assertSentCount(1);
+    }
 }
