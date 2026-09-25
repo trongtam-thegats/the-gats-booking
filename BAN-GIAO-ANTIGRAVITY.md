@@ -1,7 +1,7 @@
 # Bàn giao: hệ thống đặt bàn The Gats + tích hợp Sapo FnB
 
 Tài liệu này viết cho một công cụ/AI khác tiếp quản. Đọc hết file này **trước**, rồi mới đọc
-`CLAUDE.md` (ràng buộc kỹ thuật của repo). Cập nhật lần cuối: 18/09/2026.
+`CLAUDE.md` (ràng buộc kỹ thuật của repo). Cập nhật lần cuối: 25/09/2026.
 
 ---
 
@@ -15,7 +15,7 @@ Tài liệu này viết cho một công cụ/AI khác tiếp quản. Đọc hế
 | CSDL máy chủ | `thegats_booking`, mật khẩu ở `/root/.thegats_booking_db` |
 | Tên miền | `booking.thegats.vn` (khu quản trị, nhìn cả chuỗi) · `booking.gemination.vn` · `booking.drinkinghealing.com` (trang khách từng quán) |
 | Hai quán | `gemination` = Gemination Đà Lạt (branch id 2) · `drinking-healing` = Drinking Healing (branch id 3) |
-| Kiểm thử | `php artisan test` — **299 test, tất cả đang xanh**. Chạy trên MySQL (`thegats_booking_test`), không phải SQLite |
+| Kiểm thử | `php artisan test` — **311 test, tất cả đang xanh**. Chạy trên MySQL (`thegats_booking_test`), không phải SQLite |
 
 Quy ước mã nguồn: **tên hàm/biến/lệnh viết tiếng Việt không dấu**, chú thích tiếng Việt. Đây là chủ ý,
 đừng đổi sang tiếng Anh.
@@ -42,9 +42,11 @@ null** — đã có test quét toàn bộ mã nguồn chặn tái phạm.
 
 ---
 
-## 2. Hai luồng tích hợp Sapo FnB đang chạy
+## 2. Các luồng tự động đang chạy
 
-Sapo **chưa cấp API chính thức** cho gói này. Cả hai luồng dưới đây dựa trên chính các địa chỉ mà
+Hai luồng đầu nói chuyện với Sapo, luồng thứ ba báo cho nhân viên.
+
+Sapo **chưa cấp API chính thức** cho gói này. Hai luồng Sapo dưới đây dựa trên chính các địa chỉ mà
 giao diện web của Sapo tự gọi. Ai tiếp quản cần biết chúng có thể đổi khi Sapo cập nhật.
 
 ### 2.1 Kéo hoá đơn từ Sapo về (cần trình duyệt đã đăng nhập)
@@ -119,7 +121,38 @@ Mã nguồn: `App\Services\SapoDatLichService`, lệnh `sapo:day-dat-lich` (có 
 **Quy tắc sống còn:** đẩy sang Sapo hỏng thì **không bao giờ được làm hỏng luồng đặt bàn của khách** —
 mọi lỗi nuốt lại và ghi vào `sapo_error`, lệnh cron thử lại sau.
 
-### 2.3 Biến môi trường cần có trên máy chủ
+### 2.3 Thông báo đẩy cho nhân viên (Web Push)
+
+Có đơn mới là điện thoại nhân viên kêu ngay. Trang bật nằm ở `/quan-ly/thong-bao`, có nút *Gửi thử*.
+
+**Viết tay bằng OpenSSL + `hash_hkdf` có sẵn của PHP, KHÔNG thêm gói Composer** — xem
+`App\Support\WebPush`: VAPID JWT ES256 (RFC 8292) + mã hoá nội dung aes128gcm (RFC 8291).
+Composer không có trên PATH máy lập trình (bản `composer.phar` nằm ở `C:\PHP\composer.phar`), và
+tự viết crypto thì phải tự kiểm được — nên `tests/Feature/WebPushTest.php` **đóng vai trình duyệt**:
+giải mã ngược gói tin bằng khoá riêng của mình và verify chữ ký JWT. Đừng xoá test đó.
+
+- `App\Services\ThongBaoDayService` chọn người nhận: tài khoản `is_active` mà `canAccessBranch()`
+  đúng địa điểm của đơn (quản trị thấy cả chuỗi).
+- Báo khi: **đơn mới từ web**, **nhân viên đặt hộ**, **khách tự huỷ** (`byType === 'customer'`), và
+  **lần đầu** đẩy sang Sapo thất bại — cron chạy 5 phút một lần nên phải chặn báo lặp, nếu không điện
+  thoại kêu cả đêm.
+- Bảng `push_subscriptions` (mỗi thiết bị một dòng). Dịch vụ đẩy trả **404/410 thì xoá địa chỉ**,
+  lỗi tạm thời thì giữ lại.
+- `public/sw.js` (service worker, cố ý KHÔNG cache gì), `public/manifest.webmanifest`,
+  `public/js/thong-bao.js`. nginx có
+  `location = /manifest.webmanifest { default_type application/manifest+json; }` — thiếu dòng này
+  Safari bỏ qua manifest.
+- Sinh khoá: `php artisan push:khoa-moi` rồi dán vào `.env`. **Đổi khoá = mọi thiết bị phải bật lại.**
+
+**Giới hạn của iOS, không phải lỗi:** iPhone (16.4+) chỉ nhận Web Push khi trang đã được **Thêm vào
+Màn hình chính** và mở từ biểu tượng đó. Dấu trang Safari thường thì `PushManager` không tồn tại.
+Giao diện nói thẳng điều này thay vì báo "không hỗ trợ".
+
+**Bẫy Windows:** `openssl_pkey_new()` trả `false` kèm lỗi vô nghĩa *"No such process"* vì không tìm
+thấy `openssl.cnf`. Khai `OPENSSL_CNF=C:/PHP/extras/ssl/openssl.cnf` trong `.env` và `phpunit.xml`
+(**dùng dấu `/`**, dotenv báo lỗi escape với `\`). Máy chủ Linux không cần.
+
+### 2.4 Biến môi trường cần có trên máy chủ
 
 Giá trị thật nằm trong `/var/www/thegats-booking/.env` và `~/.thegats_sapo_token` trên máy lập trình.
 **Đừng chép giá trị vào tài liệu hay repo.**
@@ -132,7 +165,14 @@ SAPO_DAT_LICH_URL=https://8fcb38937d4e4531add16289f9368c69.sapofnb.vn
 SAPO_MERCHANT_ID=19579
 # tuỳ chọn: SAPO_DAT_LICH_TU_LUC (chỉ đẩy đơn xác nhận từ mốc này),
 #           SAPO_DAT_LICH_SOM_NHAT_PHUT / SAPO_DAT_LICH_XA_NHAT_NGAY (mức dự phòng)
+
+VAPID_PUBLIC_KEY=<87 ký tự>
+VAPID_PRIVATE_KEY=<43 ký tự>
+VAPID_SUBJECT=mailto:datban@thegats.vn
+# chỉ máy Windows: OPENSSL_CNF=C:/PHP/extras/ssl/openssl.cnf
 ```
+
+Cron trên máy chủ (`/etc/cron.d/thegats-booking`): `booking:remind` và `sapo:day-dat-lich`, mỗi 5 phút.
 
 ---
 
@@ -151,7 +191,7 @@ sửa được bằng mã.**
 
 Bảng chính: `bookings`, `dining_tables` (chỉ có cột `code`, **không có cột `name`**), `areas`,
 `branches`, `brands`, `invoices`, `invoice_items`, `pos_customers`, `guest_notes`, `notification_logs`,
-`booking_deletions`, `settings`.
+`booking_deletions`, `push_subscriptions`, `settings`.
 
 Sao lưu tự động: `/root/backups/backup.sh` chạy 03:00 hằng đêm cho cả ba CSDL, giữ 14 ngày.
 
@@ -183,6 +223,12 @@ Sao lưu tự động: `/root/backups/backup.sh` chạy 03:00 hằng đêm cho c
 - **Cột mới phải khai trong `casts()`.** Quên `sapo_pushed_at` làm trang chi tiết đơn lỗi 500 trên máy
   thật (18/09). Test xanh mà trang vỡ, vì không test nào mở trang đó — nay đã có.
 - **Đêm kinh doanh của hoá đơn cắt lúc 07:00**, khác cách xếp giờ đặt bàn.
+- **Branch tạo trong test KHÔNG mang giá trị mặc định của DB** vào bộ nhớ: phải khai rõ `is_active`,
+  `max_party_size`, `max_advance_days`, `slot_minutes`, nếu không `BookingService::create()` ném lỗi
+  khó hiểu ("Quán chỉ nhận đặt trước tối đa ngày").
+- **Menu khu quản trị trên điện thoại gấp lại bằng ô tích ẩn** (`#mo-menu` + bộ chọn `~` trong
+  `admin.css`), **không một dòng JS**. Ô tích phải nằm TRƯỚC `.side-nav` trong HTML. Bấm sang trang
+  khác là tự đóng vì trang tải lại.
 - `XlsxReader` phải đọc theo luồng (`XMLReader` + `zip://`); nạp cả bảng vào SimpleXML giết tiến trình
   PHP với tệp 14 MB.
 
@@ -203,6 +249,10 @@ Sao lưu tự động: `/root/backups/backup.sh` chạy 03:00 hằng đêm cho c
    mạnh nhiều lần.
 5. Đơn Sapo đầu tiên được đẩy thử (mã Sapo **2609181**, quán Drinking Healing 18/09 20:30) có ghi chú
    lỗi `Bàn: ,` do lấy nhầm tên bàn. Đã vá; đơn đó bên Sapo vẫn dùng được.
+6. **Thông báo đẩy chưa được kiểm chứng trên iPhone thật** — phần mã hoá có test tự kiểm, nhưng đường
+   đi tới Apple thì chỉ máy thật mới xác nhận được. Việc đầu tiên nên làm: bảo một nhân viên thêm
+   trang vào Màn hình chính, bật thông báo, bấm *Gửi thử*. Không kêu thì xem
+   `storage/logs/laravel-*.log` (dòng "Dịch vụ đẩy từ chối" có mã HTTP của Apple).
 
 ---
 
