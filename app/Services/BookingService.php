@@ -22,7 +22,10 @@ class BookingService
         protected BookingNotifier $notifier,
         protected SapoDatLichService $sapo,
         protected ThongBaoDayService $thongBao,
-    ) {}
+        protected ?ZaloNhomService $zaloNhom = null,
+    ) {
+        $this->zaloNhom ??= app(ZaloNhomService::class);
+    }
 
     /**
      * Tao booking moi va giu ban.
@@ -130,6 +133,9 @@ class BookingService
 
         // Bao cho nhan vien tren dien thoai. $actor === null nghia la khach tu dat.
         $this->thongBao->donMoi($booking->load('branch'), $actor !== null);
+
+        // Gui thong bao don moi vao nhom Zalo cua quan.
+        $this->zaloNhom->guiDonMoi($booking->loadMissing(['branch', 'diningTables', 'area']), $actor !== null);
 
         return $booking;
     }
@@ -434,6 +440,7 @@ class BookingService
         // Nhan vien can biet ngay khi KHACH tu huy; don do chinh ho huy thi thoi.
         if ($byType === 'customer') {
             $this->thongBao->khachHuy($booking->fresh('branch'));
+            $this->zaloNhom->guiKhachHuy($booking->fresh(['branch', 'diningTables', 'area']));
         }
 
         $this->notifier->send($booking->fresh(['branch', 'diningTables']), 'cancelled');

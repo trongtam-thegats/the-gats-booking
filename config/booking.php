@@ -47,6 +47,29 @@ return [
         'openssl_cnf' => env('OPENSSL_CNF', ''),
     ],
 
+    /*
+     * Gui thong bao dat ban vao nhom Zalo cua tung quan qua Engine Bot (https://zalo.thegats.vn).
+     *
+     * Bat/tat toan bo hoac ghi de ten nhom cua tung quan qua bien moi truong.
+     * Cu phap ZALO_GROUP_MAP: "slug_quan:Ten Nhom Zalo,slug_quan_2:Ten Nhom Zalo 2"
+     */
+    'zalo_group' => [
+        'bat' => (bool) env('ZALO_GROUP_BAT', true),
+        'engine_url' => rtrim((string) env('ZALO_ENGINE_URL', 'https://zalo.thegats.vn'), '/'),
+        'nhom' => array_merge([
+            'drinking-healing' => env('ZALO_GROUP_DH', "DH's Booking"),
+            'gemination' => env('ZALO_GROUP_GEMI_DALAT', 'Gemination Đà Lạt - Booking'),
+            'gemination-da-lat' => env('ZALO_GROUP_GEMI_DALAT', 'Gemination Đà Lạt - Booking'),
+            'gemination-ba-na' => env('ZALO_GROUP_GEMI_BANA', "Gemination Bà Nà's Booking"),
+        ], collect(explode(',', (string) env('ZALO_GROUP_MAP', '')))
+            ->map(fn ($cap) => array_map('trim', explode(':', $cap, 2)))
+            ->filter(fn ($cap) => count($cap) === 2 && $cap[0] !== '' && $cap[1] !== '')
+            ->mapWithKeys(fn ($cap) => [$cap[0] => $cap[1]])
+            ->all()
+        ),
+        'timeout' => (int) env('ZALO_GROUP_TIMEOUT', 10),
+    ],
+
     'sapo_token' => env('SAPO_DONG_BO_TOKEN', ''),
     'sapo_stores' => collect(explode(',', (string) env('SAPO_STORES', '')))
         ->map(fn ($cap) => array_map('trim', explode(':', $cap, 2)))
