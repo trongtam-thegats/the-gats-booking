@@ -12,6 +12,7 @@ use App\Http\Controllers\Admin\FloorController;
 use App\Http\Controllers\Admin\GuestController;
 use App\Http\Controllers\Admin\InvoiceController;
 use App\Http\Controllers\Admin\PasswordController;
+use App\Http\Controllers\Admin\PasswordResetController;
 use App\Http\Controllers\Admin\ReportController;
 use App\Http\Controllers\Admin\SettingController;
 use App\Http\Controllers\Admin\ThongBaoController;
@@ -33,6 +34,12 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('quan-ly')->name('admin.')->middleware('admin.site')->group(function () {
     Route::get('dang-nhap', [AuthController::class, 'showLogin'])->name('login');
     Route::post('dang-nhap', [AuthController::class, 'login'])->name('login.submit');
+
+    // Quen mat khau va dat lai mat khau qua email
+    Route::get('quen-mat-khau', [PasswordResetController::class, 'showForgotPassword'])->name('password.forgot');
+    Route::post('quen-mat-khau', [PasswordResetController::class, 'sendResetLinkEmail'])->name('password.email');
+    Route::get('dat-lai-mat-khau/{token}', [PasswordResetController::class, 'showResetForm'])->name('password.reset.form');
+    Route::post('dat-lai-mat-khau', [PasswordResetController::class, 'resetPassword'])->name('password.reset.submit');
 
     Route::middleware(['auth', 'role', 'password.change'])->group(function () {
         Route::post('dang-xuat', [AuthController::class, 'logout'])->name('logout');

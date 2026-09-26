@@ -16,6 +16,12 @@
         </span>
     </div>
 
+    @if (session('status'))
+        <div class="alert alert-success">
+            {{ session('status') }}
+        </div>
+    @endif
+
     @if ($errors->any())
         <div class="alert alert-error">
             @foreach ($errors->all() as $message)
@@ -34,10 +40,11 @@
             <label for="password">Mật khẩu</label>
             <input type="password" id="password" name="password" required>
         </div>
-        <div class="field full">
+        <div class="field full" style="display:flex; justify-content:space-between; align-items:center;">
             <label class="check">
                 <input type="checkbox" name="remember" value="1"> Ghi nhớ đăng nhập
             </label>
+            <a href="{{ route('admin.password.forgot') }}" class="muted small">Quên mật khẩu?</a>
         </div>
         <div class="field full">
             <button class="btn" type="submit" style="width:100%; justify-content:center">Đăng nhập</button>

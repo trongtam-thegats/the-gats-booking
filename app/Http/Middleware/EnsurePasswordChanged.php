@@ -22,6 +22,10 @@ class EnsurePasswordChanged
         'admin.logout',
         'admin.login',
         'admin.login.submit',
+        'admin.password.forgot',
+        'admin.password.email',
+        'admin.password.reset.form',
+        'admin.password.reset.submit',
     ];
 
     public function handle(Request $request, Closure $next): Response

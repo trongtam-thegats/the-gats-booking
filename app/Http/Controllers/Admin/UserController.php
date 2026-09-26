@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Admin;
 
 use App\Models\Brand;
 use App\Models\User;
+use App\Services\PasswordResetService;
 use App\Support\Roles;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -20,7 +21,7 @@ class UserController extends AdminController
         return view('admin.users.index', compact('users', 'brands'));
     }
 
-    public function store(Request $request)
+    public function store(Request $request, PasswordResetService $resetService)
     {
         abort_unless($request->user()->isAdmin(), 403);
 
@@ -40,21 +41,24 @@ class UserController extends AdminController
 
         // Mat khau khoi tao chinh la email: nguoi phu trach nho duoc ngay, va
         // he thong bat ho doi ngay o lan dang nhap dau (EnsurePasswordChanged).
-        User::create($data + [
+        $user = User::create($data + [
             'password' => $data['email'],
             'is_active' => true,
             'must_change_password' => true,
         ]);
 
-        return back()->with(
-            'status',
-            'Đã tạo tài khoản '.$data['email'].'. Mật khẩu khởi tạo chính là email, '
-            .'người dùng bắt buộc đổi ngay sau lần đăng nhập đầu tiên.'
-        );
+        $guiMail = $resetService->guiEmailDatLaiMatKhau($user, true);
+
+        $thongBao = 'Đã tạo tài khoản '.$data['email'].'. ';
+        $thongBao .= $guiMail
+            ? 'Đã gửi email hướng dẫn thiết lập mật khẩu tới người dùng.'
+            : 'Mật khẩu khởi tạo là chính email (chưa gửi được email, vui lòng kiểm tra SMTP).';
+
+        return back()->with('status', $thongBao);
     }
 
-    /** Dat lai mat khau ve email va bat doi lai o lan dang nhap sau. */
-    public function resetPassword(Request $request, User $user)
+    /** Dat lai mat khau va gui email huong dan toi nguoi dung. */
+    public function resetPassword(Request $request, User $user, PasswordResetService $resetService)
     {
         abort_unless($request->user()->isAdmin(), 403);
 
@@ -64,10 +68,18 @@ class UserController extends AdminController
             'password_changed_at' => null,
         ]);
 
+        $guiMail = $resetService->guiEmailDatLaiMatKhau($user);
+
+        if ($guiMail) {
+            return back()->with(
+                'status',
+                'Đã gửi email hướng dẫn đặt lại mật khẩu đến '.$user->email.'.'
+            );
+        }
+
         return back()->with(
             'status',
-            'Đã đặt lại mật khẩu của '.$user->email.' về chính email. '
-            .'Người dùng sẽ phải đổi mật khẩu ngay khi đăng nhập.'
+            'Không thể gửi email qua SMTP. Mật khẩu của '.$user->email.' đã được đặt về chính email làm phương án dự phòng.'
         );
     }
 

@@ -7,8 +7,7 @@
         <div>
             <h1>Tài khoản</h1>
             <p>Quản trị thấy toàn chuỗi. Quản lý và chỉ xem chỉ thấy quán được gắn.</p>
-            <p class="muted small">Tài khoản mới có mật khẩu khởi tạo chính là email, và bắt buộc
-                đổi mật khẩu ngay sau lần đăng nhập đầu tiên.</p>
+            <p class="muted small">Tài khoản mới sẽ nhận được email hướng dẫn thiết lập mật khẩu. Quản trị viên cũng có thể gửi lại email đặt lại mật khẩu bất cứ lúc nào.</p>
         </div>
     </div>
 
@@ -47,7 +46,7 @@
             </div>
             <div class="field full">
                 <p class="hint" style="margin:0 0 10px">
-                    Mật khẩu khởi tạo là chính email vừa nhập. Người dùng phải đổi ngay khi đăng nhập lần đầu.
+                    Hệ thống sẽ gửi email thiết lập mật khẩu tới người dùng (mật khẩu khởi tạo dự phòng vẫn là email).
                 </p>
                 <button class="btn" type="submit">Tạo tài khoản</button>
             </div>
@@ -133,7 +132,7 @@
                         <td class="num">
                             @if ($item->id !== auth()->id())
                                 <form method="post" action="{{ route('admin.users.reset', $item) }}"
-                                      onsubmit="return confirm('Đặt lại mật khẩu của {{ $item->email }} về chính email?')">
+                                      onsubmit="return confirm('Gửi email đặt lại mật khẩu đến {{ $item->email }}?')">
                                     @csrf
                                     <button class="btn btn-ghost btn-sm" type="submit">Đặt lại mật khẩu</button>
                                 </form>
