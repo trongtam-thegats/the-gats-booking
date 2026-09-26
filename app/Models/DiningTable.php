@@ -46,6 +46,29 @@ class DiningTable extends Model
         return $this->belongsToMany(Booking::class, 'booking_dining_table');
     }
 
+    /**
+     * Cac ban lien ke co the ghep truc tiep voi ban nay.
+     */
+    public function combinedTables(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            DiningTable::class,
+            'dining_table_combinations',
+            'table_id',
+            'combined_with_id'
+        );
+    }
+
+    /**
+     * Id cac ban ke can co the ghep.
+     *
+     * @return array<int, int>
+     */
+    public function combinableTableIds(): array
+    {
+        return $this->combinedTables->pluck('id')->all();
+    }
+
     public function getLabelAttribute(): string
     {
         return $this->code.' ('.$this->seats_max.' chỗ)';

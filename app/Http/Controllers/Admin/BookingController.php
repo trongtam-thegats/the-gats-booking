@@ -194,13 +194,17 @@ class BookingController extends AdminController
     {
         $this->authorizeBranch($request, $booking->branch_id);
 
+        $rawIds = array_filter((array) $request->input('table_ids', []), fn ($v) => $v !== null && $v !== '');
+        $request->merge(['table_ids' => array_values($rawIds)]);
+
         $data = $request->validate([
             'table_ids' => ['array'],
             'table_ids.*' => ['integer', 'exists:dining_tables,id'],
         ]);
 
         try {
-            $this->bookings->assignTables($booking, array_map('intval', $data['table_ids'] ?? []));
+            $ids = array_values(array_unique(array_map('intval', $data['table_ids'] ?? [])));
+            $this->bookings->assignTables($booking, $ids);
         } catch (BookingUnavailableException $e) {
             return back()->withErrors(['table_ids' => $e->getMessage()]);
         }

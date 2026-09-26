@@ -191,7 +191,7 @@ class AvailabilityService
                 fn ($w) => $w->whereNull('area_id')
                     ->orWhereHas('area', fn ($a) => $a->where('bookable', true))
             ))
-            ->with('area')
+            ->with(['area', 'combinedTables'])
             ->get();
     }
 
@@ -282,44 +282,200 @@ class AvailabilityService
      */
     public function pickTables(Collection $tables, int $partySize): array
     {
-        // 1. Ban don vua khit nhat: du cho, thua it nhat.
-        $single = $tables
-            ->filter(fn (DiningTable $t) => $t->seats_max >= $partySize)
+        // 1. Uu tien ban don vua khit nhat:
+        // Ban phai thoa man: seats_min <= partySize <= seats_max.
+        // Uu tien ban co seats_max nho nhat (it thua cho nhat), roi den sort_order.
+        $singleFit = $tables
+            ->filter(fn (DiningTable $t) => $t->seats_min <= $partySize && $t->seats_max >= $partySize)
             ->sortBy([
                 fn (DiningTable $a, DiningTable $b) => $a->seats_max <=> $b->seats_max,
                 fn (DiningTable $a, DiningTable $b) => $a->sort_order <=> $b->sort_order,
             ])
             ->first();
 
-        if ($single) {
-            return [$single];
+        if ($singleFit) {
+            return [$singleFit];
         }
 
-        // 2. Ghep ban trong cung khu vuc.
-        $groups = $tables
-            ->filter(fn (DiningTable $t) => $t->combinable)
-            ->groupBy(fn (DiningTable $t) => (string) ($t->area_id ?? 'none'));
+        // 2. Ghep cac ban nho phu hop (trong cung khu vuc, uu tien cac cap ban lien ke nhau).
+        $combo = $this->timComboGhepBan($tables, $partySize);
+        if ($combo) {
+            return $combo;
+        }
+
+        // 3. Neu khong co ban don vua khit va khong the ghep ban nho:
+        // Chi cho phep xep ban don lon hon neu seats_min khong vuot qua nguong cho phep
+        // va tuyet doi khong xep khach it nguoi (<= 3 khach) vao ban lon/Sofa (seats_min >= 4).
+        $singleTolerant = $tables
+            ->filter(function (DiningTable $t) use ($partySize) {
+                if ($t->seats_max < $partySize) {
+                    return false;
+                }
+                // Khach tu 3 nguoi tro xuong: TUYET DOI KHONG xep vao ban co seats_min >= 4 (nhu Sofa, Dining Room)
+                if ($partySize <= 3 && $t->seats_min >= 4) {
+                    return false;
+                }
+                // Khong chenh lech qua 2 cho so voi seats_min
+                return ($t->seats_min - $partySize) <= 2;
+            })
+            ->sortBy([
+                fn (DiningTable $a, DiningTable $b) => $a->seats_max <=> $b->seats_max,
+                fn (DiningTable $a, DiningTable $b) => $a->sort_order <=> $b->sort_order,
+            ])
+            ->first();
+
+        if ($singleTolerant) {
+            return [$singleTolerant];
+        }
+
+        return [];
+    }
+
+    /**
+     * Tim to hop ban ghep phu hop nhat trong cung khu vuc.
+     * Uu tien cac ban lien ke nhau (neu quan da dinh nghia so do ban lien ke).
+     *
+     * @param  Collection<int, DiningTable>  $tables
+     * @return array<int, DiningTable>
+     */
+    protected function timComboGhepBan(Collection $tables, int $partySize): array
+    {
+        $combinableTables = $tables->filter(fn (DiningTable $t) => $t->combinable);
+
+        $groups = $combinableTables->groupBy(fn (DiningTable $t) => (string) ($t->area_id ?? 'none'));
+
+        $bestCombo = null;
+        $bestExcess = PHP_INT_MAX;
+        $bestCount = PHP_INT_MAX;
+        $bestSort = PHP_INT_MAX;
 
         foreach ($groups as $group) {
-            $sorted = $group->sortByDesc('seats_max')->values();
-            $picked = [];
-            $seats = 0;
+            $groupTables = $group->values();
+            $tableCount = $groupTables->count();
 
-            foreach ($sorted as $table) {
-                if (count($picked) >= self::MAX_TABLES_PER_BOOKING) {
-                    break;
+            if ($tableCount < 2) {
+                continue;
+            }
+
+            // Kiem tra xem trong nhom nay co ban nao da duoc khai bao ban lien ke khong
+            $coKhaiBaoLienKe = $groupTables->contains(fn (DiningTable $t) => $t->combinedTables->isNotEmpty());
+
+            $candidates = [];
+
+            if ($coKhaiBaoLienKe) {
+                // Duyet theo do thi lien ke: BFS tu tung ban de tim cac chuoi lien ke
+                $idMap = $groupTables->keyBy('id');
+                $visitedSets = [];
+
+                foreach ($groupTables as $startTable) {
+                    $this->timChuoiLienKe(
+                        $startTable,
+                        [$startTable],
+                        $idMap,
+                        $partySize,
+                        $candidates,
+                        $visitedSets
+                    );
+                }
+            } else {
+                // Truong hop chi nhanh chua thiet lap cap ban lien ke:
+                // Tim tap hop ban trong cung khu vuc (uu tien thu tu sort_order gan nhau)
+                $sorted = $groupTables->sortBy('sort_order')->values();
+                $picked = [];
+                $seats = 0;
+
+                foreach ($sorted as $table) {
+                    if (count($picked) >= self::MAX_TABLES_PER_BOOKING) {
+                        break;
+                    }
+
+                    $picked[] = $table;
+                    $seats += (int) $table->seats_max;
+
+                    if ($seats >= $partySize) {
+                        $candidates[] = $picked;
+                        break;
+                    }
+                }
+            }
+
+            // Danh gia cac to hop ung vien
+            foreach ($candidates as $combo) {
+                $totalSeats = array_sum(array_map(fn (DiningTable $t) => (int) $t->seats_max, $combo));
+                if ($totalSeats < $partySize) {
+                    continue;
                 }
 
-                $picked[] = $table;
-                $seats += (int) $table->seats_max;
+                $excess = $totalSeats - $partySize;
+                $count = count($combo);
+                $sort = array_sum(array_map(fn (DiningTable $t) => (int) $t->sort_order, $combo));
 
-                if ($seats >= $partySize) {
-                    return $picked;
+                // So sanh: it thua cho nhat -> it ban nhat -> sort_order nho nhat
+                if ($excess < $bestExcess ||
+                    ($excess === $bestExcess && $count < $bestCount) ||
+                    ($excess === $bestExcess && $count === $bestCount && $sort < $bestSort)) {
+                    $bestCombo = $combo;
+                    $bestExcess = $excess;
+                    $bestCount = $count;
+                    $bestSort = $sort;
                 }
             }
         }
 
-        return [];
+        return $bestCombo ?? [];
+    }
+
+    /**
+     * De quy tim cac to hop ban lien ke nhau tu 2 toi MAX_TABLES_PER_BOOKING ban.
+     *
+     * @param  array<int, DiningTable>  $currentCombo
+     * @param  Collection<int, DiningTable>  $availableMap
+     * @param  array<int, array<int, DiningTable>>  &$candidates
+     * @param  array<string, bool>  &$visitedSets
+     */
+    protected function timChuoiLienKe(
+        DiningTable $latestTable,
+        array $currentCombo,
+        Collection $availableMap,
+        int $partySize,
+        array &$candidates,
+        array &$visitedSets
+    ): void {
+        $seats = array_sum(array_map(fn (DiningTable $t) => (int) $t->seats_max, $currentCombo));
+
+        // Neu da du cho cho khach, luu lai to hop
+        if (count($currentCombo) >= 2 && $seats >= $partySize) {
+            $candidates[] = $currentCombo;
+            return;
+        }
+
+        // Neu da dat so ban toi da, dung lai
+        if (count($currentCombo) >= self::MAX_TABLES_PER_BOOKING) {
+            return;
+        }
+
+        // Duyet cac ban ke can voi cac ban hien co trong to hop
+        $currentIds = array_map(fn (DiningTable $t) => $t->id, $currentCombo);
+
+        foreach ($currentCombo as $tableInCombo) {
+            foreach ($tableInCombo->combinedTables as $neighbor) {
+                if (! $availableMap->has($neighbor->id) || in_array($neighbor->id, $currentIds, true)) {
+                    continue;
+                }
+
+                $nextTable = $availableMap->get($neighbor->id);
+                $newCombo = array_merge($currentCombo, [$nextTable]);
+
+                $ids = array_map(fn (DiningTable $t) => $t->id, $newCombo);
+                sort($ids);
+                $key = implode('-', $ids);
+
+                if (! isset($visitedSets[$key])) {
+                    $visitedSets[$key] = true;
+                    $this->timChuoiLienKe($nextTable, $newCombo, $availableMap, $partySize, $candidates, $visitedSets);
+                }
+            }
+        }
     }
 
     /**

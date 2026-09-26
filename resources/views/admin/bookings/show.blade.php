@@ -197,29 +197,62 @@
 
         <div class="card">
             <h2>Xếp bàn</h2>
-            <p class="sub">Đang giữ: <b>{{ $booking->tableCodes() }}</b>. Chỉ hiện các bàn còn trống trong khung giờ này.</p>
+            <p class="sub">Đang giữ: <b>{{ $booking->tableCodes() ?: 'Chưa xếp bàn' }}</b>. Chỉ hiện các bàn còn trống trong khung giờ này.</p>
 
-            <form method="post" action="{{ route('admin.bookings.tables', $booking) }}"
+            <form method="post" action="{{ route('admin.bookings.tables', $booking) }}" id="form-xep-ban"
                   @class(['is-readonly' => ! auth()->user()->canWrite()])>
                 @csrf
                 @php($assigned = $booking->diningTables->pluck('id')->all())
-                @php($options = $freeTables->concat($booking->diningTables)->unique('id')->sortBy('code'))
+                @php($options = $freeTables->concat($booking->diningTables)->unique('id')->load('combinedTables'))
+                @php($optionsByArea = $options->groupBy(fn ($t) => $t->area?->name ?? 'Bàn chưa phân khu'))
 
                 @if ($options->isEmpty())
                     <p class="muted">Chi nhánh chưa khai báo bàn nào, hoặc tất cả đã kín trong khung giờ này.</p>
                 @else
-                    <div style="display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:8px">
-                        @foreach ($options as $table)
-                            <label class="check">
-                                <input type="checkbox" name="table_ids[]" value="{{ $table->id }}"
-                                       @checked(in_array($table->id, $assigned, true))>
-                                {{ $table->code }}
-                                <span class="muted small">{{ $table->seats_max }} chỗ@if ($table->area) · {{ $table->area->name }} @endif</span>
-                            </label>
+                    <div id="table-selects-wrapper" style="display:flex; flex-direction:column; gap:10px; max-width:540px">
+                        @php($selectedList = count($assigned) > 0 ? $assigned : [null])
+                        @foreach ($selectedList as $idx => $assignedId)
+                            <div class="table-row-item" style="display:flex; align-items:center; gap:8px">
+                                <div style="flex:1">
+                                    <select name="table_ids[]" class="table-picker">
+                                        <option value="">-- Chọn bàn --</option>
+                                        @foreach ($optionsByArea as $areaName => $tables)
+                                            <optgroup label="{{ $areaName }}">
+                                                @foreach ($tables as $t)
+                                                    <option value="{{ $t->id }}"
+                                                            data-seats-min="{{ $t->seats_min }}"
+                                                            data-seats-max="{{ $t->seats_max }}"
+                                                            data-code="{{ $t->code }}"
+                                                            data-combined='@json($t->combinedTables->pluck("id")->all())'
+                                                            @selected($t->id === $assignedId)>
+                                                        {{ $t->code }} ({{ $t->capacityLabel() }})
+                                                    </option>
+                                                @endforeach
+                                            </optgroup>
+                                        @endforeach
+                                    </select>
+                                </div>
+                                <button type="button" class="btn btn-ghost btn-sm btn-remove-table" title="Gỡ bàn này"
+                                        style="color:var(--danger, #e53e3e); padding:6px 10px; font-size:13px; line-height:1">
+                                    ✕ Gỡ
+                                </button>
+                            </div>
                         @endforeach
                     </div>
+
+                    <div style="margin-top:12px; display:flex; align-items:center; gap:12px; flex-wrap:wrap">
+                        @if (auth()->user()->canWrite())
+                            <button type="button" id="btn-add-table" class="btn btn-ghost btn-sm" style="display:inline-flex; align-items:center; gap:4px">
+                                <span>+</span> Ghép thêm bàn
+                            </button>
+                        @endif
+                        <span id="table-summary" class="muted small"></span>
+                    </div>
+
                     @if (auth()->user()->canWrite())
-                        <button class="btn btn-ghost btn-sm" type="submit" style="margin-top:14px">Lưu xếp bàn</button>
+                        <div style="margin-top:16px">
+                            <button class="btn btn-primary btn-sm" type="submit">Lưu thay đổi</button>
+                        </div>
                     @endif
                 @endif
             </form>
@@ -331,4 +364,117 @@
         </script>
         @endpush
     @endif
+
+    @push('scripts')
+    <script>
+    (function () {
+        const wrapper = document.getElementById('table-selects-wrapper');
+        const form    = document.getElementById('form-xep-ban');
+        const btnAdd  = document.getElementById('btn-add-table');
+        const summary = document.getElementById('table-summary');
+        const partySize = @json($booking->party_size);
+
+        if (!wrapper || !form) return;
+
+        function capNhatSummary() {
+            const selects = wrapper.querySelectorAll('select.table-picker');
+            let totalSeats = 0;
+            let count = 0;
+            const selectedIds = new Set();
+            let hasDuplicate = false;
+
+            selects.forEach(sel => {
+                const opt = sel.options[sel.selectedIndex];
+                if (sel.value && opt) {
+                    if (selectedIds.has(sel.value)) {
+                        hasDuplicate = true;
+                    }
+                    selectedIds.add(sel.value);
+                    totalSeats += parseInt(opt.getAttribute('data-seats-max') || '0', 10);
+                    count++;
+                }
+            });
+
+            if (count === 0) {
+                summary.textContent = 'Chưa chọn bàn nào (đoàn ' + partySize + ' khách).';
+                summary.style.color = 'var(--muted)';
+            } else {
+                let msg = 'Đã chọn ' + count + ' bàn · Tổng sức chứa: ' + totalSeats + ' chỗ (đoàn ' + partySize + ' khách)';
+                if (hasDuplicate) {
+                    msg += ' · ⚠️ Có bàn bị chọn trùng!';
+                    summary.style.color = 'var(--danger, #e53e3e)';
+                } else if (totalSeats < partySize) {
+                    msg += ' · ⚠️ Thiếu ' + (partySize - totalSeats) + ' chỗ';
+                    summary.style.color = '#d97706';
+                } else {
+                    msg += ' · Đủ chỗ ✓';
+                    summary.style.color = 'var(--gold)';
+                }
+                summary.textContent = msg;
+            }
+
+            const removeBtns = wrapper.querySelectorAll('.btn-remove-table');
+            removeBtns.forEach(btn => {
+                btn.style.visibility = (selects.length > 1) ? 'visible' : 'hidden';
+            });
+        }
+
+        function ganSuKienDong(row) {
+            const select = row.querySelector('select.table-picker');
+            const btnRemove = row.querySelector('.btn-remove-table');
+
+            if (select) {
+                select.addEventListener('change', capNhatSummary);
+            }
+
+            if (btnRemove) {
+                btnRemove.addEventListener('click', () => {
+                    const totalRows = wrapper.querySelectorAll('.table-row-item').length;
+                    if (totalRows > 1) {
+                        row.remove();
+                    } else {
+                        if (select) select.value = '';
+                    }
+                    capNhatSummary();
+                });
+            }
+        }
+
+        wrapper.querySelectorAll('.table-row-item').forEach(ganSuKienDong);
+
+        if (btnAdd) {
+            btnAdd.addEventListener('click', () => {
+                const currentRows = wrapper.querySelectorAll('.table-row-item');
+                if (currentRows.length >= 4) {
+                    alert('Tối đa chỉ ghép được 4 bàn.');
+                    return;
+                }
+
+                const templateRow = currentRows[0];
+                if (!templateRow) return;
+
+                const newRow = templateRow.cloneNode(true);
+                const select = newRow.querySelector('select.table-picker');
+                if (select) {
+                    select.value = '';
+                }
+                wrapper.appendChild(newRow);
+                ganSuKienDong(newRow);
+                capNhatSummary();
+                if (select) select.focus();
+            });
+        }
+
+        form.addEventListener('submit', () => {
+            wrapper.querySelectorAll('select.table-picker').forEach(sel => {
+                if (!sel.value) {
+                    sel.disabled = true;
+                }
+            });
+        });
+
+        capNhatSummary();
+    })();
+    </script>
+    @endpush
 @endsection
