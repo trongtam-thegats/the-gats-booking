@@ -73,7 +73,7 @@ class DrinkingHealingSeeder extends Seeder
                 'turn_minutes' => 120,
                 'min_lead_minutes' => 60,
                 'max_advance_days' => 30,
-                'max_party_size' => 20,
+                'max_party_size' => 16,
                 'auto_confirm' => false,
                 'is_active' => true,
             ]
