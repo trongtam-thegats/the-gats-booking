@@ -86,6 +86,7 @@ Route::prefix('quan-ly')->name('admin.')->middleware('admin.site')->group(functi
             Route::post('dat-ban/{booking}/sapo-da-xu-ly', [AdminBookingController::class, 'sapoDaXuLy'])
                 ->name('bookings.sapo-da-xu-ly');
             Route::post('dat-ban/{booking}/doi-lich', [AdminBookingController::class, 'reschedule'])->name('bookings.reschedule');
+            Route::post('so-do-ban/dong-bo-sapo', [FloorController::class, 'syncSapo'])->name('floor.sync-sapo');
             Route::post('khach/ghi-chu', [GuestController::class, 'saveNote'])->name('guests.note');
 
             // Tra nhanh ten khach theo so dien thoai cho form dat ban ho khach.

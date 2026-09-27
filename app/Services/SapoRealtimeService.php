@@ -466,6 +466,11 @@ class SapoRealtimeService
             $ketQua['banGiaiPhong']++;
         }
 
+        Cache::put("sapo_last_sync_{$slug}", [
+            'at' => $now->toIso8601String(),
+            'result' => $ketQua,
+        ], now()->addHours(24));
+
         return $ketQua;
     }
 

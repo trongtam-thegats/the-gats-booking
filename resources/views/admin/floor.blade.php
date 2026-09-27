@@ -8,7 +8,27 @@
             <h1>Sơ đồ bàn</h1>
             <p>{{ $branch->name }} · {{ \Illuminate\Support\Carbon::parse($date)->format('d/m/Y') }}</p>
         </div>
-        <a class="btn" href="{{ route('admin.bookings.create', ['branch' => $branch->id]) }}">Đặt bàn hộ khách</a>
+        <div class="row" style="align-items:center;gap:10px">
+            @if ($sapoActive)
+                <form method="post" action="{{ route('admin.floor.sync-sapo') }}" style="display:inline-flex;align-items:center;gap:6px;margin:0">
+                    @csrf
+                    <input type="hidden" name="branch" value="{{ $branch->id }}">
+                    <input type="hidden" name="date" value="{{ $date }}">
+                    <span class="pill" style="background:#e6f7ed;color:#0d8a43;border:1px solid #b3e6c5;font-weight:600"
+                          title="{{ $sapoLastSync ? 'Đồng bộ lần cuối: '.\Illuminate\Support\Carbon::parse($sapoLastSync['at'])->format('H:i:s d/m') : 'Tự động đồng bộ mỗi phút' }}">
+                        🟢 Sapo Realtime
+                    </span>
+                    <button type="submit" class="btn btn-ghost btn-sm" title="Đồng bộ ngay trạng thái bàn đang có khách từ Sapo FnB">
+                        🔄 Đồng bộ Sapo
+                    </button>
+                </form>
+            @elseif ($branch->slug === 'drinking-healing')
+                <span class="pill muted" title="Vào Cài đặt gửi tin để bật Sapo Realtime">
+                    ⚪ Sapo: Chưa bật
+                </span>
+            @endif
+            <a class="btn" href="{{ route('admin.bookings.create', ['branch' => $branch->id]) }}">Đặt bàn hộ khách</a>
+        </div>
     </div>
 
     <form method="get" class="filters">
@@ -25,6 +45,11 @@
                 <a class="btn btn-ghost btn-sm"
                    href="{{ route('admin.floor', ['branch' => $branch->id, 'date' => \Illuminate\Support\Carbon::parse($date)->addDay()->toDateString()]) }}">Hôm sau →</a>
             </div>
+        </div>
+        <div class="field" style="align-self:flex-end">
+            <label class="small muted" style="display:inline-flex;align-items:center;gap:6px;cursor:pointer;margin-bottom:8px">
+                <input type="checkbox" id="auto-refresh" onchange="toggleAutoRefresh(this.checked)"> Tự làm mới (60s)
+            </label>
         </div>
     </form>
 
@@ -63,10 +88,11 @@
                         @foreach ($slots as $slot)
                             @php($booking = $grid[$table->id][$slot] ?? null)
                             @if ($booking)
-                                <td class="cell busy is-{{ $booking->status }}">
+                                @php($isSapo = !empty($booking->sapo_code) || str_contains($booking->internal_note ?? '', 'Sapo'))
+                                <td class="cell busy is-{{ $booking->status }} @if($isSapo) is-sapo @endif">
                                     <a href="{{ route('admin.bookings.show', $booking) }}"
-                                       title="{{ $booking->customer_name }} · {{ $booking->party_size }} khách · {{ $booking->statusLabel() }}">
-                                        {{ $booking->party_size }}k
+                                       title="@if($isSapo)[Sapo #{{ $booking->sapo_code }}] @endif{{ $booking->customer_name }} · {{ $booking->party_size }} khách · {{ $booking->statusLabel() }}">
+                                        {{ $booking->party_size }}k{!! $isSapo ? '<span class="sapo-tag">Sapo</span>' : '' !!}
                                     </a>
                                 </td>
                             @else
@@ -88,9 +114,15 @@
                     </thead>
                     <tbody>
                     @forelse ($bookings as $item)
+                        @php($isSapo = !empty($item->sapo_code) || str_contains($item->internal_note ?? '', 'Sapo'))
                         <tr>
                             <td><b>{{ substr($item->start_time, 0, 5) }}</b></td>
-                            <td><a href="{{ route('admin.bookings.show', $item) }}">{{ $item->code }}</a></td>
+                            <td>
+                                <a href="{{ route('admin.bookings.show', $item) }}">{{ $item->code }}</a>
+                                @if ($isSapo)
+                                    <span class="pill" style="background:#fff2e6;color:#d95300;border:1px solid #ffcca3;font-size:10.5px;padding:1px 5px;margin-left:4px" title="Đơn khách đang ngồi từ Sapo POS">⚡ Sapo</span>
+                                @endif
+                            </td>
                             <td>{{ $item->customer_name }}<br><span class="muted small">{{ $item->customer_phone }}</span></td>
                             <td class="num">{{ $item->party_size }}</td>
                             <td>{{ $item->tableCodes() }}</td>
@@ -104,4 +136,34 @@
             </div>
         </div>
     @endif
+
+    <script>
+        (function() {
+            var checkbox = document.getElementById('auto-refresh');
+            if (!checkbox) return;
+            var saved = localStorage.getItem('floor_auto_refresh') === '1';
+            checkbox.checked = saved;
+            var timer = null;
+
+            function startTimer() {
+                if (timer) clearInterval(timer);
+                timer = setInterval(function() {
+                    window.location.reload();
+                }, 60000);
+            }
+
+            if (saved) {
+                startTimer();
+            }
+
+            window.toggleAutoRefresh = function(checked) {
+                localStorage.setItem('floor_auto_refresh', checked ? '1' : '0');
+                if (checked) {
+                    startTimer();
+                } else if (timer) {
+                    clearInterval(timer);
+                }
+            };
+        })();
+    </script>
 @endsection

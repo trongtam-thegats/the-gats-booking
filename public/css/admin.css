@@ -359,6 +359,26 @@ table.floor td.table-cell span { display: block; color: var(--muted); font-size:
 .cell.busy.is-seated { background: color-mix(in srgb, var(--info) 20%, transparent); }
 .cell.busy.is-seated a { color: var(--info); }
 
+.cell.busy.is-sapo {
+    background: color-mix(in srgb, #ff6600 22%, transparent);
+    border: 1px solid #ff6600;
+}
+.cell.busy.is-sapo a {
+    color: #ea580c;
+    font-weight: 700;
+}
+.sapo-tag {
+    display: inline-block;
+    font-size: 8px;
+    line-height: 1.1;
+    padding: 1px 3px;
+    border-radius: 3px;
+    background: #ff6600;
+    color: #fff;
+    margin-left: 3px;
+    vertical-align: 1px;
+}
+
 .cell.busy.is-pending { background: color-mix(in srgb, var(--gold) 10%, transparent); }
 
 /* --- Thong bao --- */

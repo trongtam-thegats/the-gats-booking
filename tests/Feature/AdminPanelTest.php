@@ -465,4 +465,45 @@ class AdminPanelTest extends TestCase
 
         $this->assertTrue($this->admin->fresh()->is_active);
     }
+
+    public function test_so_do_ban_hien_thi_nhan_sapo_khi_co_booking_tu_pos(): void
+    {
+        $table = $this->branchA->diningTables()->create([
+            'code' => 'B1',
+            'seats_min' => 2,
+            'seats_max' => 4,
+            'is_active' => true,
+        ]);
+
+        $booking = $this->makeBooking($this->brandA, $this->branchA, [
+            'booking_date' => Carbon::today()->toDateString(),
+            'start_time' => '18:00',
+            'party_size' => 2,
+        ]);
+        $booking->update([
+            'status' => Booking::STATUS_SEATED,
+            'sapo_code' => 'ORD-12345',
+        ]);
+        $booking->diningTables()->sync([$table->id]);
+
+        $res = $this->actingAs($this->admin)
+            ->get(route('admin.floor', ['branch' => $this->branchA->id, 'date' => Carbon::today()->toDateString()]));
+
+        $res->assertOk();
+        $res->assertSee('sapo-tag');
+        $res->assertSee('⚡ Sapo');
+        $res->assertSee('ORD-12345');
+    }
+
+    public function test_dong_bo_sapo_tu_so_do_ban_chuyen_huong_ve_kem_thong_bao(): void
+    {
+        $res = $this->actingAs($this->admin)
+            ->post(route('admin.floor.sync-sapo'), [
+                'branch' => $this->branchA->id,
+                'date' => Carbon::today()->toDateString(),
+            ]);
+
+        $res->assertRedirect();
+        $res->assertSessionHas('error');
+    }
 }
