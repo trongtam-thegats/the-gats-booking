@@ -291,14 +291,14 @@ class XepBanVaGhepBanTest extends TestCase
         $slot1900 = collect($slots)->firstWhere('time', '19:00');
         $this->assertNotNull($slot1900);
         $this->assertTrue($slot1900['available']);
-        // Max party size phai la 6 + 8 = 14 (do Sofa 1 + Sofa 2 ghep duoc)
-        $this->assertSame(14, $slot1900['max_party_size']);
+        // Max party size phai la 18 (do Sofa 1 + Sofa 2 ghep duoc 18 khach)
+        $this->assertSame(18, $slot1900['max_party_size']);
 
         // Thu giu cho ca Sofa 1 va Sofa 2 luc 19:00
         $booking = app(BookingService::class)->create($this->branch, [
             'customer_name' => 'Doan Dong',
             'customer_phone' => '0912345678',
-            'party_size' => 14,
+            'party_size' => 18,
             'booking_date' => $date,
             'start_time' => '19:00',
             'source' => 'online',
@@ -556,17 +556,53 @@ class XepBanVaGhepBanTest extends TestCase
 
         $avail = app(AvailabilityService::class);
 
-        // Truong hop 1: Tat ca sofa deu trong, khach 14 nguoi -> ghep S1 + S2 (14 cho)
+        // Truong hop 1: Tat ca sofa deu trong, khach 18 nguoi -> ghep duoc S1 + S2 hoac S3 + S4 (18 cho)
         $allSofas = $this->branch->diningTables()->with('combinedTables')->whereIn('id', [$s1->id, $s2->id, $s3->id, $s4->id])->get();
-        $picked14 = $avail->pickTables($allSofas, 14);
-        $this->assertCount(2, $picked14);
-        $codes = collect($picked14)->pluck('code')->all();
-        $this->assertEqualsCanonicalizing(['Sofa 1', 'Sofa 2'], $codes);
+        $picked18 = $avail->pickTables($allSofas, 18);
+        $this->assertCount(2, $picked18);
+        $this->assertSame(18, $avail->tongSucChuaToHop($picked18));
+
+        // Suc chua toi da cua cum sofa khi ghep la 18 khach
+        $this->assertSame(18, $avail->maxPartySizeForTables($allSofas));
 
         // Truong hop 2: S1 va S4 ban, chi con S2 va S3 trong
         // Khach 14 nguoi -> KHONG duoc ghep S2 voi S3
         $onlyS2S3 = $this->branch->diningTables()->with('combinedTables')->whereIn('id', [$s2->id, $s3->id])->get();
         $pickedFail = $avail->pickTables($onlyS2S3, 14);
         $this->assertEmpty($pickedFail);
+    }
+
+    public function test_drinking_healing_ban_cao_khong_ghep_khi_combinable_false(): void
+    {
+        $area = $this->branch->areas()->create(['name' => 'Bàn Cao', 'bookable' => true]);
+
+        $t1 = $this->branch->diningTables()->create([
+            'area_id' => $area->id,
+            'code' => 'T1',
+            'table_type' => 'high_table',
+            'seats_min' => 2,
+            'seats_max' => 4,
+            'combinable' => false,
+            'is_active' => true,
+            'sort_order' => 1,
+        ]);
+        $t2 = $this->branch->diningTables()->create([
+            'area_id' => $area->id,
+            'code' => 'T2',
+            'table_type' => 'high_table',
+            'seats_min' => 2,
+            'seats_max' => 4,
+            'combinable' => false,
+            'is_active' => true,
+            'sort_order' => 2,
+        ]);
+
+        $tables = $this->branch->diningTables()->with('combinedTables')->whereIn('id', [$t1->id, $t2->id])->get();
+        $avail = app(AvailabilityService::class);
+
+        // Do combinable = false nen khong ghep duoc cho khach 6 nguoi
+        $picked6 = $avail->pickTables($tables, 6);
+        $this->assertEmpty($picked6);
+        $this->assertSame(4, $avail->maxPartySizeForTables($tables));
     }
 }

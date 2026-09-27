@@ -35,19 +35,19 @@ class DrinkingHealingSeeder extends Seeder
         // Bon ban K cu (K1-K4) da duoc quan gop thanh mot ban dai duy nhat.
         ['Dining Room', 'K1,K2,K3,K4', 'Dining Room', 'dining', 6, 16, false],
 
-        // Sofa - khong ghep, moi bo la mot khong gian rieng
-        ['Sofa 1', 'S1', 'Sofa', 'sofa', 4, 6, false],
-        ['Sofa 2', 'S2', 'Sofa', 'sofa', 5, 8, false],
-        ['Sofa 3', 'S3', 'Sofa', 'sofa', 5, 8, false],
-        ['Sofa 4', 'S4', 'Sofa', 'sofa', 5, 8, false],
+        // Sofa - ghep S1-S2 va S3-S4 cho doan toi da 18 khach
+        ['Sofa 1', 'S1', 'Sofa', 'sofa', 4, 6, true],
+        ['Sofa 2', 'S2', 'Sofa', 'sofa', 5, 8, true],
+        ['Sofa 3', 'S3', 'Sofa', 'sofa', 5, 8, true],
+        ['Sofa 4', 'S4', 'Sofa', 'sofa', 5, 8, true],
 
-        // Ban cao
-        ['T1', '', 'Bàn Cao', 'high_table', 2, 4, true],
-        ['T2', '', 'Bàn Cao', 'high_table', 2, 4, true],
-        ['T3', '', 'Bàn Cao', 'high_table', 2, 4, true],
-        ['T4', '', 'Bàn Cao', 'high_table', 4, 6, true],
-        ['T5', '', 'Bàn Cao', 'high_table', 4, 6, true],
-        ['T6', '', 'Bàn Cao', 'high_table', 2, 4, true],
+        // Ban cao - tam thoi khong ghep ban
+        ['T1', '', 'Bàn Cao', 'high_table', 2, 4, false],
+        ['T2', '', 'Bàn Cao', 'high_table', 2, 4, false],
+        ['T3', '', 'Bàn Cao', 'high_table', 2, 4, false],
+        ['T4', '', 'Bàn Cao', 'high_table', 4, 6, false],
+        ['T5', '', 'Bàn Cao', 'high_table', 4, 6, false],
+        ['T6', '', 'Bàn Cao', 'high_table', 2, 4, false],
     ];
 
     /** Thu tu hien thi cua cac khu. */
@@ -73,7 +73,7 @@ class DrinkingHealingSeeder extends Seeder
                 'turn_minutes' => 120,
                 'min_lead_minutes' => 60,
                 'max_advance_days' => 30,
-                'max_party_size' => 16,
+                'max_party_size' => 18,
                 'auto_confirm' => false,
                 'is_active' => true,
             ]

@@ -284,7 +284,7 @@ class BookingService
             $current = $booking->diningTables;
             $currentStillFree = $current->isNotEmpty()
                 && $current->every(fn ($table) => $free->contains('id', $table->id));
-            $currentSeats = (int) $current->sum('seats_max');
+            $currentSeats = $this->availability->tongSucChuaToHop($current);
 
             if ($currentStillFree && $currentSeats >= $partySize) {
                 $tableIds = $current->pluck('id')->all();

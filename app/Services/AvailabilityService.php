@@ -404,7 +404,7 @@ class AvailabilityService
 
             // Danh gia cac to hop ung vien
             foreach ($candidates as $combo) {
-                $totalSeats = array_sum(array_map(fn (DiningTable $t) => (int) $t->seats_max, $combo));
+                $totalSeats = $this->tongSucChuaToHop($combo);
                 if ($totalSeats < $partySize) {
                     continue;
                 }
@@ -426,6 +426,26 @@ class AvailabilityService
         }
 
         return $bestCombo ?? [];
+    }
+
+    /**
+     * Tinh tong suc chua thuc te cua mot to hop ban ghep.
+     * Ho tro quy tac dac thu khi ghep cap sofa o Drinking Healing (S1+S2 = 18 khach, S3+S4 = 18 khach).
+     *
+     * @param  array<int, DiningTable>|\Illuminate\Support\Collection<int, DiningTable>  $tables
+     */
+    public function tongSucChuaToHop($tables): int
+    {
+        $list = is_array($tables) ? $tables : $tables->values()->all();
+        if (count($list) === 2) {
+            $codes = array_map(fn (DiningTable $t) => $t->code, $list);
+            sort($codes);
+            if ($codes === ['Sofa 1', 'Sofa 2'] || $codes === ['Sofa 3', 'Sofa 4']) {
+                return 18;
+            }
+        }
+
+        return (int) array_sum(array_map(fn (DiningTable $t) => (int) $t->seats_max, $list));
     }
 
     /**
@@ -461,7 +481,7 @@ class AvailabilityService
         $firstTable = $currentCombo[0] ?? null;
         $maxLimit = $this->maxTablesPerCombo($firstTable);
 
-        $seats = array_sum(array_map(fn (DiningTable $t) => (int) $t->seats_max, $currentCombo));
+        $seats = $this->tongSucChuaToHop($currentCombo);
 
         // Neu da du cho cho khach, luu lai to hop
         if (count($currentCombo) >= 2 && $seats >= $partySize) {
@@ -533,7 +553,7 @@ class AvailabilityService
                         if (! $idMap->has($neighbor->id)) {
                             continue;
                         }
-                        $seats2 = (int) $table->seats_max + (int) $neighbor->seats_max;
+                        $seats2 = $this->tongSucChuaToHop([$table, $neighbor]);
                         if ($seats2 > $maxCombo) {
                             $maxCombo = $seats2;
                         }
@@ -541,7 +561,7 @@ class AvailabilityService
                         if ($limit >= 3) {
                             foreach ($neighbor->combinedTables as $third) {
                                 if ($third->id !== $table->id && $idMap->has($third->id)) {
-                                    $seats3 = $seats2 + (int) $third->seats_max;
+                                    $seats3 = $this->tongSucChuaToHop([$table, $neighbor, $third]);
                                     if ($seats3 > $maxCombo) {
                                         $maxCombo = $seats3;
                                     }
