@@ -31,6 +31,7 @@
         'noService' => __('booking.form.no_service_day'),
         'failed' => __('booking.form.slots_failed'),
         'sending' => __('booking.form.sending'),
+        'partyOverSlotMax' => __('booking.form.party_over_slot_max', ['time' => '__time__', 'max' => '__max__']),
         'branch' => $branch->name,
     ];
 @endphp
@@ -152,6 +153,8 @@
                 @endif
             </div>
 
+            <p class="hint" id="party-slot-hint" style="margin:8px 0 0; display:none; color: var(--gold);"></p>
+
             <input type="number" id="party_size" name="party_size" class="party-custom"
                    min="1" max="{{ $branch->max_party_size }}"
                    value="{{ $initialParty }}" required>
@@ -179,6 +182,7 @@
             <div class="slots" id="slots">
                 @foreach ($initialSlots['slots'] as $slot)
                     <button type="button" class="slot" data-time="{{ $slot['time'] }}"
+                            data-max-party="{{ $slot['max_party_size'] ?? '' }}"
                             @disabled(! $slot['available'])
                             @if ($slot['reason']) title="{{ $slot['reason'] }}" @endif
                     >{{ $slot['time'] }}</button>
@@ -321,6 +325,8 @@
         if (!match) dateInput.classList.add('is-open');
     }
 
+    const partySlotHint = document.getElementById('party-slot-hint');
+
     function syncPartyChips() {
         const match = partyChips.querySelector('.chip[data-size="' + partyInput.value + '"]');
         markSelected(partyChips, '.chip', match);
@@ -328,6 +334,51 @@
         if (!match) {
             partyInput.classList.add('is-open');
             if (partyMore) partyMore.classList.add('is-selected');
+        }
+
+        // Cap nhat trang thai vo hieu hoa cho cac chip vuot qua suc chua toi da cua gio dang chon
+        let maxPartyForSlot = 0;
+        if (startTime.value) {
+            const selectedBtn = slotsBox.querySelector('.slot[data-time="' + startTime.value + '"]');
+            if (selectedBtn && selectedBtn.dataset.maxParty) {
+                maxPartyForSlot = parseInt(selectedBtn.dataset.maxParty, 10) || 0;
+            }
+        }
+
+        const maxBranch = @json((int) $branch->max_party_size);
+
+        partyChips.querySelectorAll('.chip[data-size]').forEach(chip => {
+            const size = parseInt(chip.dataset.size, 10);
+            if (maxPartyForSlot > 0 && size > maxPartyForSlot) {
+                chip.disabled = true;
+                chip.classList.add('is-disabled');
+                chip.title = t.partyOverSlotMax.replace('__time__', startTime.value).replace('__max__', maxPartyForSlot);
+            } else {
+                chip.disabled = false;
+                chip.classList.remove('is-disabled');
+                chip.removeAttribute('title');
+            }
+        });
+
+        if (partyMore) {
+            if (maxPartyForSlot > 0 && 9 > maxPartyForSlot) {
+                partyMore.disabled = true;
+                partyMore.classList.add('is-disabled');
+                partyMore.title = t.partyOverSlotMax.replace('__time__', startTime.value).replace('__max__', maxPartyForSlot);
+            } else {
+                partyMore.disabled = false;
+                partyMore.classList.remove('is-disabled');
+                partyMore.removeAttribute('title');
+            }
+        }
+
+        if (partySlotHint) {
+            if (maxPartyForSlot > 0 && maxPartyForSlot < maxBranch) {
+                partySlotHint.textContent = t.partyOverSlotMax.replace('__time__', startTime.value).replace('__max__', maxPartyForSlot);
+                partySlotHint.style.display = 'block';
+            } else {
+                partySlotHint.style.display = 'none';
+            }
         }
     }
 
@@ -344,6 +395,7 @@
             button.className = 'slot';
             button.textContent = slot.time;
             button.dataset.time = slot.time;
+            button.dataset.maxParty = slot.max_party_size || '';
             button.disabled = !slot.available;
             if (slot.reason) button.title = slot.reason;
 
@@ -366,6 +418,7 @@
             messageBox.textContent = t.legend;
         }
 
+        syncPartyChips();
         syncHeadings();
     }
 
@@ -423,6 +476,7 @@
 
         startTime.value = button.dataset.time;
         markSelected(slotsBox, '.slot', button);
+        syncPartyChips();
         syncHeadings();
         guestStep.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
@@ -451,7 +505,7 @@
 
     partyChips.addEventListener('click', event => {
         const chip = event.target.closest('.chip');
-        if (!chip) return;
+        if (!chip || chip.disabled) return;
 
         if (chip === partyMore) {
             partyInput.classList.add('is-open');

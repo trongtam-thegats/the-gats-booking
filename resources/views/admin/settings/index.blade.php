@@ -184,10 +184,49 @@
             </div>
         </div>
 
+        <div class="card">
+            <h2>Đồng bộ bàn Sapo FnB (Realtime)</h2>
+            <p class="sub">
+                Tự động quét các bàn đang phục vụ trên Sapo FnB để khóa bàn trên trang đặt bàn The Gats.
+                Hệ thống sẽ tự động gửi cảnh báo vào nhóm Zalo khi Cookie hết hạn.
+            </p>
+
+            <div class="form-grid">
+                <div class="field full">
+                    <label class="check">
+                        <input type="checkbox" name="sapo_realtime_dh_bat" value="1"
+                               @checked((bool) ($values['sapo_realtime_dh_bat'] ?? config('booking.sapo_realtime.bat_dh')))>
+                        Bật đồng bộ realtime cho <b>Drinking & Healing</b> (Store 89781)
+                    </label>
+                </div>
+
+                <div class="field full">
+                    <label for="sapo_cookie_dh">
+                        Token / Cookie Sapo FnB (Drinking & Healing)
+                        {!! $has('sapo_cookie_dh') ? '<span class="muted">(đã lưu token/cookie)</span>' : '' !!}
+                    </label>
+                    <textarea id="sapo_cookie_dh" name="sapo_cookie_dh" rows="3" style="font-family:monospace; font-size:12px;"
+                              placeholder="Dán Token (lấy từ localStorage.getItem('token')) hoặc Cookie của fnb.mysapo.vn vào đây...">{{ old('sapo_cookie_dh') }}</textarea>
+                    <span class="hint">Dán Token JWT lấy từ Console <code>localStorage.getItem('token')</code> hoặc toàn bộ chuỗi Cookie. Để trống nếu muốn giữ nguyên token đã lưu.</span>
+                </div>
+            </div>
+        </div>
+
         <div class="row" style="margin-top:16px">
             <button class="btn" type="submit">Lưu cấu hình</button>
         </div>
     </form>
+
+    <div class="card">
+        <h2>Kiểm tra kết nối Sapo</h2>
+        <p class="sub">
+            Kiểm tra xem Cookie Sapo của Drinking & Healing có hợp lệ và đọc được danh sách bàn đang phục vụ hay không.
+        </p>
+        <form method="post" action="{{ route('admin.settings.kiem-tra-sapo') }}">
+            @csrf
+            <button class="btn btn-ghost" type="submit">Kiểm tra kết nối Sapo ngay</button>
+        </form>
+    </div>
 
     <div class="card">
         <h2>Gửi thử</h2>

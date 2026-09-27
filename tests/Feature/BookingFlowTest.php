@@ -409,4 +409,15 @@ class BookingFlowTest extends TestCase
         $this->get('http://booking.quanthu.test/quan-ly')
             ->assertRedirect();
     }
+
+    public function test_slots_tra_ve_max_party_size(): void
+    {
+        $slots = $this->slots(2);
+
+        $this->assertNotEmpty($slots);
+        foreach ($slots as $slot) {
+            $this->assertArrayHasKey('max_party_size', $slot);
+            $this->assertIsInt($slot['max_party_size']);
+        }
+    }
 }

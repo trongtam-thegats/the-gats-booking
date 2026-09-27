@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Admin;
 use App\Models\NotificationLog;
 use App\Models\Setting;
 use App\Services\Notifications\ZaloTokenStore;
+use App\Services\SapoRealtimeService;
 use App\Support\SettingsApplier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Mail;
@@ -66,19 +67,23 @@ class SettingController extends AdminController
             'zalo_template_confirmed' => ['nullable', 'string', 'max:60'],
             'zalo_template_cancelled' => ['nullable', 'string', 'max:60'],
             'zalo_template_reminder' => ['nullable', 'string', 'max:60'],
+            'sapo_realtime_dh_bat' => ['nullable'],
+            'sapo_cookie_dh' => ['nullable', 'string'],
         ], [], [
             'reminder_lead_minutes' => 'thời điểm nhắc lịch',
             'mail_mailer' => 'cách gửi email',
             'mail_from_address' => 'email người gửi',
+            'sapo_cookie_dh' => 'Cookie Sapo Drinking Healing',
         ]);
 
         $values = [
             'notify_channels' => implode(',', $data['notify_channels'] ?? []),
             'reminder_lead_minutes' => (string) $data['reminder_lead_minutes'],
+            'sapo_realtime_dh_bat' => $request->boolean('sapo_realtime_dh_bat') ? '1' : '0',
         ];
 
         foreach (SettingsApplier::KEYS as $key) {
-            if ($key === 'notify_channels' || $key === 'reminder_lead_minutes') {
+            if ($key === 'notify_channels' || $key === 'reminder_lead_minutes' || $key === 'sapo_realtime_dh_bat') {
                 continue;
             }
 
@@ -164,5 +169,23 @@ class SettingController extends AdminController
         if ($code !== '' && $code !== '100') {
             throw new \RuntimeException('CodeResult '.$code.': '.$response->json('ErrorMessage', ''));
         }
+    }
+
+    /**
+     * Kiem tra truc tiep cookie Sapo tu form Cai dat.
+     */
+    public function kiemTraSapo(Request $request, SapoRealtimeService $sapo)
+    {
+        abort_unless($request->user()->isAdmin(), 403);
+
+        $cookie = (string) ($request->input('sapo_cookie_dh') ?: $sapo->layCookie('drinking-healing'));
+
+        $ketQua = $sapo->kiemTraKetNoi($cookie, 'drinking-healing');
+
+        if (! $ketQua['thanhCong']) {
+            return back()->withErrors(['sapo_cookie_dh' => $ketQua['thongDiep']]);
+        }
+
+        return back()->with('status', $ketQua['thongDiep']);
     }
 }

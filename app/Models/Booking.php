@@ -39,6 +39,7 @@ class Booking extends Model
         'status', 'source', 'locale', 'note', 'internal_note',
         'confirmed_by', 'confirmed_at', 'cancelled_at', 'cancel_reason',
         'cancelled_by_type', 'seated_at', 'completed_at', 'created_by',
+        'sapo_code', 'sapo_pushed_at', 'sapo_error', 'sapo_can_xu_ly',
     ];
 
     protected function casts(): array

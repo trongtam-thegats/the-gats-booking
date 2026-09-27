@@ -78,6 +78,18 @@ return [
         ->all(),
 
     /*
+     * Dong bo trang thai ban realtime tu Sapo FnB qua Cloud Cookie.
+     * Bat truoc cho Drinking Healing de theo doi va tu dong khoa ban.
+     */
+    'sapo_realtime' => [
+        'bat_dh' => (bool) env('SAPO_REALTIME_DH_BAT', false),
+        'cookie_dh' => env('SAPO_COOKIE_DH', ''),
+        'store_id_dh' => (int) env('SAPO_STORE_ID_DH', 89781),
+        'turn_minutes_dh' => (int) env('SAPO_TURN_MINUTES_DH', 120),
+        'timeout' => (int) env('SAPO_REALTIME_TIMEOUT', 10),
+    ],
+
+    /*
     |--------------------------------------------------------------------------
     | Kenh gui thong bao cho khach
     |--------------------------------------------------------------------------

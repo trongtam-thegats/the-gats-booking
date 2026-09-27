@@ -357,6 +357,9 @@ class AvailabilityService
                 continue;
             }
 
+            $firstTable = $groupTables->first();
+            $maxLimit = $this->maxTablesPerCombo($firstTable);
+
             // Kiem tra xem trong nhom nay co ban nao da duoc khai bao ban lien ke khong
             $coKhaiBaoLienKe = $groupTables->contains(fn (DiningTable $t) => $t->combinedTables->isNotEmpty());
 
@@ -385,7 +388,7 @@ class AvailabilityService
                 $seats = 0;
 
                 foreach ($sorted as $table) {
-                    if (count($picked) >= self::MAX_TABLES_PER_BOOKING) {
+                    if (count($picked) >= $maxLimit) {
                         break;
                     }
 
@@ -426,7 +429,21 @@ class AvailabilityService
     }
 
     /**
-     * De quy tim cac to hop ban lien ke nhau tu 2 toi MAX_TABLES_PER_BOOKING ban.
+     * So luong ban ghep toi da cho tung loai cho ngoi.
+     * Quay bar cho phep ghep toi da 3 ghe canh nhau; cac loai ban khac
+     * (ban cao, sofa...) chi cho phep ghep toi da 2 ban noi tiep nhau.
+     */
+    public function maxTablesPerCombo(?DiningTable $table): int
+    {
+        if ($table && $table->table_type === 'bar_seat') {
+            return 3;
+        }
+
+        return 2;
+    }
+
+    /**
+     * De quy tim cac to hop ban lien ke nhau tu 2 toi so ban toi da cho phep.
      *
      * @param  array<int, DiningTable>  $currentCombo
      * @param  Collection<int, DiningTable>  $availableMap
@@ -441,6 +458,9 @@ class AvailabilityService
         array &$candidates,
         array &$visitedSets
     ): void {
+        $firstTable = $currentCombo[0] ?? null;
+        $maxLimit = $this->maxTablesPerCombo($firstTable);
+
         $seats = array_sum(array_map(fn (DiningTable $t) => (int) $t->seats_max, $currentCombo));
 
         // Neu da du cho cho khach, luu lai to hop
@@ -449,8 +469,8 @@ class AvailabilityService
             return;
         }
 
-        // Neu da dat so ban toi da, dung lai
-        if (count($currentCombo) >= self::MAX_TABLES_PER_BOOKING) {
+        // Neu da dat so ban toi da cho loai cho ngoi nay, dung lai
+        if (count($currentCombo) >= $maxLimit) {
             return;
         }
 
@@ -479,9 +499,75 @@ class AvailabilityService
     }
 
     /**
+     * Suc chua toi da (so khach lon nhat) co the phuc vu tu tap hop cac ban con trong.
+     * Tinh ca ban don va to hop ghep toi da theo tung loai cho ngoi.
+     *
+     * @param  Collection<int, DiningTable>  $freeTables
+     */
+    public function maxPartySizeForTables(Collection $freeTables): int
+    {
+        if ($freeTables->isEmpty()) {
+            return 0;
+        }
+
+        $maxSingle = (int) $freeTables->max('seats_max');
+
+        $combinableTables = $freeTables->filter(fn (DiningTable $t) => $t->combinable);
+        $groups = $combinableTables->groupBy(fn (DiningTable $t) => (string) ($t->area_id ?? 'none'));
+
+        $maxCombo = 0;
+
+        foreach ($groups as $group) {
+            $groupTables = $group->values();
+            if ($groupTables->count() < 2) {
+                continue;
+            }
+
+            $coKhaiBaoLienKe = $groupTables->contains(fn (DiningTable $t) => $t->combinedTables->isNotEmpty());
+
+            if ($coKhaiBaoLienKe) {
+                $idMap = $groupTables->keyBy('id');
+                foreach ($groupTables as $table) {
+                    $limit = $this->maxTablesPerCombo($table);
+                    foreach ($table->combinedTables as $neighbor) {
+                        if (! $idMap->has($neighbor->id)) {
+                            continue;
+                        }
+                        $seats2 = (int) $table->seats_max + (int) $neighbor->seats_max;
+                        if ($seats2 > $maxCombo) {
+                            $maxCombo = $seats2;
+                        }
+
+                        if ($limit >= 3) {
+                            foreach ($neighbor->combinedTables as $third) {
+                                if ($third->id !== $table->id && $idMap->has($third->id)) {
+                                    $seats3 = $seats2 + (int) $third->seats_max;
+                                    if ($seats3 > $maxCombo) {
+                                        $maxCombo = $seats3;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                $first = $groupTables->first();
+                $limit = $this->maxTablesPerCombo($first);
+                $top = $groupTables->sortByDesc('seats_max')->take($limit);
+                $seats = (int) $top->sum('seats_max');
+                if ($seats > $maxCombo) {
+                    $maxCombo = $seats;
+                }
+            }
+        }
+
+        return max($maxSingle, $maxCombo);
+    }
+
+    /**
      * Trang thai tung khung gio trong ngay cho so khach cu the.
      *
-     * @return array<int, array{time: string, available: bool, tables_left: int, reason: ?string}>
+     * @return array<int, array{time: string, available: bool, tables_left: int, max_party_size: int, reason: ?string}>
      */
     public function daySlots(
         Branch $branch,
@@ -513,6 +599,7 @@ class AvailabilityService
             $reason = null;
             $available = true;
             $tablesLeft = 0;
+            $slotMaxParty = 0;
 
             if ($closedAllDay) {
                 $available = false;
@@ -528,6 +615,7 @@ class AvailabilityService
                 $free = $tables->reject(fn (DiningTable $t) => in_array((int) $t->id, $busyIds, true))->values();
                 $picked = $this->pickTables($free, $partySize);
                 $tablesLeft = $free->count();
+                $slotMaxParty = $this->maxPartySizeForTables($free);
 
                 if (! $picked) {
                     $available = false;
@@ -539,6 +627,7 @@ class AvailabilityService
                 'time' => $time,
                 'available' => $available,
                 'tables_left' => $tablesLeft,
+                'max_party_size' => $slotMaxParty,
                 'reason' => $reason,
             ];
         }

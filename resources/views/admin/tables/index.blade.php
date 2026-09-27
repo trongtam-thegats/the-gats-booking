@@ -255,4 +255,76 @@
             </table>
         </div>
     </div>
+
+    <div class="card">
+        <h2>Cặp bàn ghép liền kề</h2>
+        <p class="sub">
+            Quy định các bàn được phép ghép với nhau khi có nhóm khách đông (hệ thống chỉ ghép các cặp được thiết lập ở đây, tối đa 2 bàn).
+            Ví dụ: <b>Sofa 1</b> ghép với <b>Sofa 2</b>, <b>Sofa 3</b> ghép với <b>Sofa 4</b> (không ghép Sofa 2 với 3).
+        </p>
+
+        <form method="post" action="{{ route('admin.tables.combinations.store', $branch) }}" class="form-grid" style="margin-bottom:20px">
+            @csrf
+            <div class="field">
+                <label for="comb_table_a">Bàn thứ nhất</label>
+                <select id="comb_table_a" name="table_id" required>
+                    <option value="">-- Chọn bàn --</option>
+                    @foreach ($branch->diningTables as $t)
+                        <option value="{{ $t->id }}">{{ $t->code }} ({{ $t->area?->name ?? 'Chưa phân khu' }} · {{ $t->seats_max }} chỗ)</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="field">
+                <label for="comb_table_b">Bàn thứ hai</label>
+                <select id="comb_table_b" name="combined_with_id" required>
+                    <option value="">-- Chọn bàn --</option>
+                    @foreach ($branch->diningTables as $t)
+                        <option value="{{ $t->id }}">{{ $t->code }} ({{ $t->area?->name ?? 'Chưa phân khu' }} · {{ $t->seats_max }} chỗ)</option>
+                    @endforeach
+                </select>
+            </div>
+            <div class="field full">
+                <button class="btn btn-ghost btn-sm" type="submit">Ghép 2 bàn này</button>
+            </div>
+        </form>
+
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Bàn 1</th>
+                        <th>Bàn 2</th>
+                        <th>Khu vực</th>
+                        <th class="num">Tổng sức chứa</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody>
+                @forelse ($combinations as $pair)
+                    <tr>
+                        <td><b>{{ $pair['table_a']->code }}</b> ({{ $pair['table_a']->seats_max }} chỗ)</td>
+                        <td><b>{{ $pair['table_b']->code }}</b> ({{ $pair['table_b']->seats_max }} chỗ)</td>
+                        <td class="small muted">
+                            {{ $pair['table_a']->area?->name ?? $pair['table_b']->area?->name ?? 'Chưa phân khu' }}
+                        </td>
+                        <td class="num"><b>{{ $pair['table_a']->seats_max + $pair['table_b']->seats_max }}</b> chỗ</td>
+                        <td class="num">
+                            <form method="post" action="{{ route('admin.tables.combinations.destroy', $branch) }}"
+                                  onsubmit="return confirm('Hủy ghép cặp bàn {{ $pair['table_a']->code }} ⟷ {{ $pair['table_b']->code }}?')">
+                                @csrf @method('DELETE')
+                                <input type="hidden" name="table_id" value="{{ $pair['table_a']->id }}">
+                                <input type="hidden" name="combined_with_id" value="{{ $pair['table_b']->id }}">
+                                <button class="btn btn-danger btn-sm" type="submit">Hủy ghép</button>
+                            </form>
+                        </td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="5" class="empty">Chưa thiết lập cặp bàn ghép nào cho chi nhánh này.</td>
+                    </tr>
+                @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>
 @endsection

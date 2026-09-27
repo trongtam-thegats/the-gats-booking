@@ -22,6 +22,7 @@ class SettingsApplier
         'zalo_access_token',
         'zalo_secret_key',
         'zalo_refresh_token',
+        'sapo_cookie_dh',
     ];
 
     /** Toan bo key trang Cai dat quan ly. */
@@ -35,6 +36,7 @@ class SettingsApplier
         'zalo_app_id', 'zalo_secret_key', 'zalo_refresh_token', 'zalo_token_expires_at',
         'zalo_template_created', 'zalo_template_confirmed',
         'zalo_template_cancelled', 'zalo_template_reminder',
+        'sapo_realtime_dh_bat', 'sapo_cookie_dh',
     ];
 
     public function apply(): void
@@ -88,6 +90,12 @@ class SettingsApplier
         $set('mail_encryption', 'mail.mailers.smtp.encryption');
         $set('mail_from_address', 'mail.from.address');
         $set('mail_from_name', 'mail.from.name');
+
+        // Sapo Realtime
+        if (isset($values['sapo_realtime_dh_bat'])) {
+            Config::set('booking.sapo_realtime.bat_dh', (bool) $values['sapo_realtime_dh_bat']);
+        }
+        $set('sapo_cookie_dh', 'booking.sapo_realtime.cookie_dh');
 
         if (! empty($values['mail_port'])) {
             Config::set('mail.mailers.smtp.port', (int) $values['mail_port']);

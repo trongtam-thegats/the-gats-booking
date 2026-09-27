@@ -19,9 +19,24 @@ class DiningTableController extends AdminController
 
         abort_if(! $branch, 404, 'Chưa có chi nhánh nào.');
 
-        $branch->load(['areas', 'diningTables.area']);
+        $branch->load(['areas', 'diningTables.area', 'diningTables.combinedTables']);
 
-        return view('admin.tables.index', compact('branches', 'branch'));
+        $combinations = collect();
+        $seenPairs = [];
+        foreach ($branch->diningTables as $t) {
+            foreach ($t->combinedTables as $neighbor) {
+                $pairKey = min($t->id, $neighbor->id).'-'.max($t->id, $neighbor->id);
+                if (! isset($seenPairs[$pairKey])) {
+                    $seenPairs[$pairKey] = true;
+                    $combinations->push([
+                        'table_a' => $t->id < $neighbor->id ? $t : $neighbor,
+                        'table_b' => $t->id < $neighbor->id ? $neighbor : $t,
+                    ]);
+                }
+            }
+        }
+
+        return view('admin.tables.index', compact('branches', 'branch', 'combinations'));
     }
 
     public function storeArea(Request $request, Branch $branch)
@@ -143,6 +158,56 @@ class DiningTableController extends AdminController
         }
 
         return back()->with('status', 'Đã tạo '.$created.' bàn.');
+    }
+
+    public function storeCombination(Request $request, Branch $branch)
+    {
+        $this->guard($request, $branch);
+
+        $data = $request->validate([
+            'table_id' => ['required', 'integer', Rule::exists('dining_tables', 'id')->where('branch_id', $branch->id)],
+            'combined_with_id' => [
+                'required', 'integer', 'different:table_id',
+                Rule::exists('dining_tables', 'id')->where('branch_id', $branch->id),
+            ],
+        ], [
+            'combined_with_id.different' => 'Hai bàn ghép với nhau phải khác nhau.',
+        ]);
+
+        $tableA = DiningTable::findOrFail($data['table_id']);
+        $tableB = DiningTable::findOrFail($data['combined_with_id']);
+
+        if (! $tableA->combinable) {
+            $tableA->update(['combinable' => true]);
+        }
+        if (! $tableB->combinable) {
+            $tableB->update(['combinable' => true]);
+        }
+
+        $tableA->combinedTables()->syncWithoutDetaching([$tableB->id]);
+        $tableB->combinedTables()->syncWithoutDetaching([$tableA->id]);
+
+        return back()->with('status', 'Đã thêm cặp bàn ghép '.$tableA->code.' ⟷ '.$tableB->code.'.');
+    }
+
+    public function destroyCombination(Request $request, Branch $branch)
+    {
+        $this->guard($request, $branch);
+
+        $data = $request->validate([
+            'table_id' => ['required', 'integer'],
+            'combined_with_id' => ['required', 'integer'],
+        ]);
+
+        $tableA = DiningTable::where('branch_id', $branch->id)->find($data['table_id']);
+        $tableB = DiningTable::where('branch_id', $branch->id)->find($data['combined_with_id']);
+
+        if ($tableA && $tableB) {
+            $tableA->combinedTables()->detach($tableB->id);
+            $tableB->combinedTables()->detach($tableA->id);
+        }
+
+        return back()->with('status', 'Đã hủy ghép cặp bàn.');
     }
 
     protected function guard(Request $request, Branch $branch): void

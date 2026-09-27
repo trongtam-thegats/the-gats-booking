@@ -521,6 +521,15 @@ textarea { resize: vertical; min-height: 84px; }
 
 .chip:hover { border-color: var(--gold); }
 .chip.is-selected { background: var(--gold); border-color: var(--gold); color: var(--on-accent); font-weight: 700; }
+.chip:disabled, .chip.is-disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    text-decoration: line-through;
+    border-color: var(--line);
+}
+.chip:disabled:hover, .chip.is-disabled:hover {
+    border-color: var(--line);
+}
 
 .party-custom { margin-top: 10px; display: none; max-width: 200px; }
 .party-custom.is-open { display: block; }

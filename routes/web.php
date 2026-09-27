@@ -127,6 +127,8 @@ Route::prefix('quan-ly')->name('admin.')->middleware('admin.site')->group(functi
             Route::delete('ban/{branch}/khu-vuc/{area}', [DiningTableController::class, 'destroyArea'])->name('areas.destroy');
             Route::post('ban/{branch}', [DiningTableController::class, 'store'])->name('tables.store');
             Route::post('ban/{branch}/hang-loat', [DiningTableController::class, 'bulkStore'])->name('tables.bulk');
+            Route::post('ban/{branch}/ghep', [DiningTableController::class, 'storeCombination'])->name('tables.combinations.store');
+            Route::delete('ban/{branch}/ghep', [DiningTableController::class, 'destroyCombination'])->name('tables.combinations.destroy');
             Route::put('ban/{branch}/{table}', [DiningTableController::class, 'update'])->name('tables.update');
             Route::delete('ban/{branch}/{table}', [DiningTableController::class, 'destroy'])->name('tables.destroy');
 
@@ -141,6 +143,7 @@ Route::prefix('quan-ly')->name('admin.')->middleware('admin.site')->group(functi
             Route::get('cai-dat', [SettingController::class, 'index'])->name('settings.index');
             Route::put('cai-dat', [SettingController::class, 'update'])->name('settings.update');
             Route::post('cai-dat/gui-thu', [SettingController::class, 'test'])->name('settings.test');
+            Route::post('cai-dat/kiem-tra-sapo', [SettingController::class, 'kiemTraSapo'])->name('settings.kiem-tra-sapo');
 
             Route::get('tai-khoan', [UserController::class, 'index'])->name('users.index');
             Route::post('tai-khoan', [UserController::class, 'store'])->name('users.store');

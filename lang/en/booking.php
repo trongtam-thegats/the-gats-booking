@@ -27,6 +27,7 @@ return [
         'other_day' => 'Other date',
 
         'party_over_max' => 'For parties over :max, please call :phone so we can arrange it for you.',
+        'party_over_slot_max' => 'Time slot :time only accommodates up to :max guests.',
         'the_venue' => 'the bar',
 
         'loading_slots' => 'Loading available times…',

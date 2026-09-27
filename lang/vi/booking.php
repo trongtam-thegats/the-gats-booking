@@ -27,6 +27,7 @@ return [
         'other_day' => 'Ngày khác',
 
         'party_over_max' => 'Đoàn trên :max khách vui lòng gọi :phone để được sắp xếp riêng.',
+        'party_over_slot_max' => 'Khung giờ :time chỉ nhận tối đa :max khách.',
         'the_venue' => 'quán',
 
         'loading_slots' => 'Đang tải khung giờ trống…',
