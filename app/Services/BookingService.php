@@ -122,6 +122,7 @@ class BookingService
                 // Nho ngon ngu khach dung luc dat de tin xac nhan gui dung thu tieng.
                 'locale' => $data['locale'] ?? app()->getLocale(),
                 'note' => $data['note'] ?? null,
+                'internal_note' => $data['internal_note'] ?? null,
                 'created_by' => $actor?->id,
                 'confirmed_at' => $branch->auto_confirm ? now() : null,
                 'confirmed_by' => $branch->auto_confirm ? $actor?->id : null,

@@ -506,4 +506,62 @@ class AdminPanelTest extends TestCase
         $res->assertRedirect();
         $res->assertSessionHas('error');
     }
+
+    public function test_bang_lich_dat_ban_dashboard_hien_thi_ca_ghi_chu_khach_va_ghi_chu_noi_bo(): void
+    {
+        $table = $this->branchA->diningTables()->create([
+            'code' => 'B1',
+            'seats_min' => 2,
+            'seats_max' => 4,
+            'is_active' => true,
+        ]);
+
+        $booking = $this->makeBooking($this->brandA, $this->branchA, [
+            'booking_date' => Carbon::today()->toDateString(),
+            'start_time' => '19:00',
+            'party_size' => 2,
+            'note' => 'Khách cần ghế em bé',
+            'internal_note' => 'Khách quen của chủ quán',
+        ]);
+        $booking->diningTables()->sync([$table->id]);
+
+        $res = $this->actingAs($this->admin)
+            ->get(route('admin.dashboard', ['date' => Carbon::today()->toDateString()]));
+
+        $res->assertOk();
+        $res->assertSee('Khách:');
+        $res->assertSee('Khách cần ghế em bé');
+        $res->assertSee('Nội bộ:');
+        $res->assertSee('Khách quen của chủ quán');
+    }
+
+    public function test_dat_ban_ho_luu_duoc_ca_ghi_chu_khach_va_ghi_chu_noi_bo(): void
+    {
+        $table = $this->branchA->diningTables()->create([
+            'code' => 'B1',
+            'seats_min' => 2,
+            'seats_max' => 4,
+            'is_active' => true,
+        ]);
+
+        $res = $this->actingAs($this->admin)
+            ->post(route('admin.bookings.store'), [
+                'branch_id' => $this->branchA->id,
+                'customer_name' => 'Nguyen Van A',
+                'customer_phone' => '0901234567',
+                'party_size' => 2,
+                'booking_date' => Carbon::tomorrow()->toDateString(),
+                'start_time' => '19:00',
+                'source' => \App\Support\NguonDatBan::PHONE,
+                'table_ids' => [$table->id],
+                'note' => 'Dị ứng đậu phộng',
+                'internal_note' => 'Đã cọc 200k tiền mặt',
+            ]);
+
+        $res->assertRedirect();
+        $booking = Booking::where('customer_phone', '0901234567')->first();
+        $this->assertNotNull($booking);
+        $this->assertSame('Dị ứng đậu phộng', $booking->note);
+        $this->assertSame('Đã cọc 200k tiền mặt', $booking->internal_note);
+    }
 }

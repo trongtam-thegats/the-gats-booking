@@ -109,9 +109,13 @@
                 <label for="customer_email">Email</label>
                 <input type="email" id="customer_email" name="customer_email" value="{{ old('customer_email') }}">
             </div>
-            <div class="field full">
-                <label for="note">Ghi chú</label>
-                <textarea id="note" name="note" maxlength="500">{{ old('note') }}</textarea>
+            <div class="field">
+                <label for="note">Ghi chú của khách</label>
+                <textarea id="note" name="note" maxlength="500" placeholder="Yêu cầu từ khách (vị trí ngồi, ghế trẻ em...)">{{ old('note') }}</textarea>
+            </div>
+            <div class="field">
+                <label for="internal_note">Ghi chú nội bộ</label>
+                <textarea id="internal_note" name="internal_note" maxlength="1000" placeholder="Lưu ý nội bộ quán (khách quen, cọc, ghi chú đón tiếp...)">{{ old('internal_note') }}</textarea>
             </div>
         </div>
 

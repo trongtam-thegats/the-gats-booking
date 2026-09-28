@@ -101,7 +101,19 @@
                         <td class="small muted">{{ $item->area?->name ?? '—' }}</td>
                         @unless ($branch)<td class="small muted">{{ $item->branch->name }}</td>@endunless
                         <td><span class="pill status-{{ $item->status }}">{{ $item->statusLabel() }}</span></td>
-                        <td class="small muted">{{ $item->note }}</td>
+                        <td class="small" style="max-width:280px; word-break:break-word">
+                            @if ($item->note)
+                                <div><span class="muted">Khách:</span> {{ $item->note }}</div>
+                            @endif
+                            @if ($item->internal_note)
+                                <div style="@if($item->note) margin-top:3px; @endif color:var(--gold-soft)" title="Ghi chú nội bộ">
+                                    <span class="muted">Nội bộ:</span> {{ $item->internal_note }}
+                                </div>
+                            @endif
+                            @if (! $item->note && ! $item->internal_note)
+                                <span class="muted">—</span>
+                            @endif
+                        </td>
                     </tr>
                 @empty
                     <tr><td colspan="9" class="empty">Chưa có đặt bàn nào cho ngày này.</td></tr>

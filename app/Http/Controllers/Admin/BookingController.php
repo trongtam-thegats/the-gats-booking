@@ -174,6 +174,7 @@ class BookingController extends AdminController
             'start_time' => ['required', 'date_format:H:i'],
             'area_id' => ['nullable', 'integer'],
             'note' => ['nullable', 'string', 'max:500'],
+            'internal_note' => ['nullable', 'string', 'max:1000'],
             'source' => ['required', Rule::in(NguonDatBan::NHAN_VIEN_CHON)],
             'table_ids' => ['nullable', 'array'],
             'table_ids.*' => ['integer', 'exists:dining_tables,id'],
