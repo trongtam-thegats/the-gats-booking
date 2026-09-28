@@ -6,6 +6,7 @@ use App\Exceptions\BookingUnavailableException;
 use App\Models\Booking;
 use App\Models\BookingDeletion;
 use App\Models\Branch;
+use App\Models\DiningTable;
 use App\Services\AvailabilityService;
 use App\Services\BookingService;
 use App\Services\GuestProfileService;
@@ -116,6 +117,51 @@ class BookingController extends AdminController
         ]);
     }
 
+    public function availableTables(Request $request)
+    {
+        $data = $request->validate([
+            'branch_id' => ['required', 'integer', 'exists:branches,id'],
+            'booking_date' => ['required', 'date_format:Y-m-d'],
+            'start_time' => ['required', 'date_format:H:i'],
+            'area_id' => ['nullable', 'integer'],
+        ]);
+
+        $this->authorizeBranch($request, (int) $data['branch_id']);
+        $branch = Branch::findOrFail($data['branch_id']);
+
+        $openMin = $this->availability->openMinutes($branch);
+        $startMin = $this->availability->normalize(
+            $this->availability->toMinutes($data['start_time']), $openMin
+        );
+        $endMin = $this->availability->endMinutesFor($branch, $startMin);
+
+        // Nhan vien dat ho nen duoc xem ca ban chi nhan qua dien thoai
+        $freeTables = $this->availability->availableTables(
+            $branch,
+            $data['booking_date'],
+            $startMin,
+            $endMin,
+            ! empty($data['area_id']) ? (int) $data['area_id'] : null,
+            null,
+            false
+        )->load(['combinedTables', 'area']);
+
+        return response()->json([
+            'tables' => $freeTables->map(fn (DiningTable $t) => [
+                'id' => $t->id,
+                'code' => $t->code,
+                'area_id' => $t->area_id,
+                'area_name' => $t->area?->name ?? 'Bàn chưa phân khu',
+                'seats_min' => $t->seats_min,
+                'seats_max' => $t->seats_max,
+                'capacity_label' => $t->capacityLabel(),
+                'table_type' => $t->table_type,
+                'combinable' => (bool) $t->combinable,
+                'combined_ids' => $t->combinedTables->pluck('id')->all(),
+            ])->values(),
+        ]);
+    }
+
     public function store(Request $request)
     {
         $data = $request->validate([
@@ -129,6 +175,8 @@ class BookingController extends AdminController
             'area_id' => ['nullable', 'integer'],
             'note' => ['nullable', 'string', 'max:500'],
             'source' => ['required', Rule::in(NguonDatBan::NHAN_VIEN_CHON)],
+            'table_ids' => ['nullable', 'array'],
+            'table_ids.*' => ['integer', 'exists:dining_tables,id'],
         ]);
 
         $this->authorizeBranch($request, (int) $data['branch_id']);
@@ -137,7 +185,10 @@ class BookingController extends AdminController
         try {
             $booking = $this->bookings->create($branch, $data, $request->user());
         } catch (BookingUnavailableException $e) {
-            return back()->withInput()->withErrors(['start_time' => $e->getMessage()]);
+            return back()->withInput()->withErrors([
+                'start_time' => $e->getMessage(),
+                'table_ids' => $e->getMessage(),
+            ]);
         }
 
         return redirect()

@@ -71,6 +71,7 @@ Route::prefix('quan-ly')->name('admin.')->middleware('admin.site')->group(functi
         // Xu ly dat ban va xem phan tich - quan tri va quan ly
         Route::middleware('role:admin,manager')->group(function () {
             Route::get('dat-ban/tao-moi', [AdminBookingController::class, 'create'])->name('bookings.create');
+            Route::get('dat-ban/ban-trong', [AdminBookingController::class, 'availableTables'])->name('bookings.available-tables');
 
             // Bao cao va du lieu ban hang: vai chi xem khong dung toi.
             Route::get('bao-cao', [ReportController::class, 'index'])->name('reports.index');

@@ -280,6 +280,15 @@ class XepBanVaGhepBanTest extends TestCase
             'sort_order' => 3,
         ]);
 
+        $this->branch->diningTables()->create([
+            'code' => 'B1',
+            'seats_min' => 2,
+            'seats_max' => 4,
+            'combinable' => false,
+            'is_active' => true,
+            'sort_order' => 10,
+        ]);
+
         // Chi ghep Sofa 1 <-> Sofa 2 (tong 14 cho). Khong ghep Sofa 2 voi Sofa 3.
         $sofa1->combinedTables()->syncWithoutDetaching([$sofa2->id]);
         $sofa2->combinedTables()->syncWithoutDetaching([$sofa1->id]);
@@ -604,5 +613,41 @@ class XepBanVaGhepBanTest extends TestCase
         $picked6 = $avail->pickTables($tables, 6);
         $this->assertEmpty($picked6);
         $this->assertSame(4, $avail->maxPartySizeForTables($tables));
+    }
+
+    public function test_khach_2_nguoi_tuyet_doi_khong_tu_dong_ghep_sofa_1_va_sofa_2(): void
+    {
+        $sofaArea = $this->branch->areas()->create(['name' => 'Sofa', 'bookable' => true]);
+
+        $s1 = $this->branch->diningTables()->create([
+            'area_id' => $sofaArea->id,
+            'code' => 'Sofa 1',
+            'table_type' => 'sofa',
+            'seats_min' => 4,
+            'seats_max' => 6,
+            'combinable' => true,
+            'is_active' => true,
+            'sort_order' => 1,
+        ]);
+        $s2 = $this->branch->diningTables()->create([
+            'area_id' => $sofaArea->id,
+            'code' => 'Sofa 2',
+            'table_type' => 'sofa',
+            'seats_min' => 5,
+            'seats_max' => 8,
+            'combinable' => true,
+            'is_active' => true,
+            'sort_order' => 2,
+        ]);
+
+        $s1->combinedTables()->attach($s2->id);
+        $s2->combinedTables()->attach($s1->id);
+
+        $tables = $this->branch->diningTables()->with('combinedTables')->whereIn('id', [$s1->id, $s2->id])->get();
+        $avail = app(AvailabilityService::class);
+
+        // Khach 2 nguoi: TUYET DOI khong duoc ghep S1 + S2
+        $picked = $avail->pickTables($tables, 2);
+        $this->assertEmpty($picked);
     }
 }

@@ -77,19 +77,33 @@ class BookingService
                 }
             }
 
-            $free = $this->availability->availableTables(
-                $branch, $date, $startMin, $endMin, $data['area_id'] ?? null,
-                null,
-                // Khach tu dat tren web thi khong xep vao khu chi nhan dat qua dien thoai.
-                $actor === null
-            );
-
-            $tables = $this->availability->pickTables($free, $partySize);
-
-            if (! $tables) {
-                throw new BookingUnavailableException(
-                    __('booking.errors.no_tables', ['count' => $partySize])
+            if (! empty($data['table_ids'])) {
+                $requestedIds = array_values(array_unique(array_map('intval', (array) $data['table_ids'])));
+                $busyIds = $this->availability->busyTableIds($branch, $date, $startMin, $endMin);
+                $conflict = array_intersect($requestedIds, $busyIds);
+                if (! empty($conflict)) {
+                    $conflictCodes = $branch->diningTables()->whereIn('id', $conflict)->pluck('code')->join(', ');
+                    throw new BookingUnavailableException("Bàn đã chọn ({$conflictCodes}) đã có khách trong khung giờ này.");
+                }
+                $tables = $branch->diningTables()->whereIn('id', $requestedIds)->get()->all();
+                if (count($tables) !== count($requestedIds)) {
+                    throw new BookingUnavailableException('Bàn đã chọn không hợp lệ.');
+                }
+            } else {
+                $free = $this->availability->availableTables(
+                    $branch, $date, $startMin, $endMin, $data['area_id'] ?? null,
+                    null,
+                    // Khach tu dat tren web thi khong xep vao khu chi nhan dat qua dien thoai.
+                    $actor === null
                 );
+
+                $tables = $this->availability->pickTables($free, $partySize);
+
+                if (! $tables) {
+                    throw new BookingUnavailableException(
+                        __('booking.errors.no_tables', ['count' => $partySize])
+                    );
+                }
             }
 
             $booking = Booking::create([
@@ -102,7 +116,7 @@ class BookingService
                 'booking_date' => $date,
                 'start_time' => $this->availability->toTimeString($startMin),
                 'end_time' => $this->availability->toTimeString($endMin),
-                'area_id' => $data['area_id'] ?? null,
+                'area_id' => ! empty($data['area_id']) ? $data['area_id'] : ($tables[0]->area_id ?? null),
                 'status' => $branch->auto_confirm ? Booking::STATUS_CONFIRMED : Booking::STATUS_PENDING,
                 'source' => $data['source'] ?? NguonDatBan::MAC_DINH,
                 // Nho ngon ngu khach dung luc dat de tin xac nhan gui dung thu tieng.

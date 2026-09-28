@@ -75,6 +75,33 @@
                 </div>
             @endif
 
+            <div class="field full" id="table-picker-section" style="margin-top:4px">
+                <label style="display:flex; justify-content:space-between; align-items:center">
+                    <span>Xếp bàn</span>
+                    <span id="table-picker-status" class="small muted"></span>
+                </label>
+                <div style="display:flex; gap:16px; margin-bottom:8px; font-size:14px">
+                    <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer">
+                        <input type="radio" name="table_choice_mode" value="auto" checked id="mode-auto">
+                        <span>Hệ thống tự xếp bàn</span>
+                    </label>
+                    <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer">
+                        <input type="radio" name="table_choice_mode" value="manual" id="mode-manual">
+                        <span>Nhân viên chỉ định bàn trống</span>
+                    </label>
+                </div>
+
+                <div id="manual-table-box" style="display:none; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:12px">
+                    <div id="table-loading" class="small muted" style="display:none">Đang tải danh sách bàn trống...</div>
+                    <div id="table-empty" class="small" style="color:var(--danger, #dc2626); display:none">Không còn bàn nào trống trong khung giờ này.</div>
+                    <div id="table-list-container" style="display:flex; flex-direction:column; gap:12px"></div>
+                    <div id="table-selection-summary" class="small" style="margin-top:10px; font-weight:600; color:var(--primary, #0f172a)"></div>
+                </div>
+                @error('table_ids')
+                    <span class="small" style="color:var(--danger, #dc2626); display:block; margin-top:4px">{{ $message }}</span>
+                @enderror
+            </div>
+
             {{-- So dien thoai dat truoc ho ten: go so xong la ten tu dien vao
                  tu danh sach khach hang, khoi phai go lai. --}}
             <div class="field">
@@ -233,6 +260,209 @@
     // Số đã điền sẵn (khách quay lại form sau khi có lỗi) thì tra luôn.
     if (oSdt.value.trim() !== '') {
         tra();
+    }
+})();
+
+(function () {
+    var modeAuto = document.getElementById('mode-auto');
+    var modeManual = document.getElementById('mode-manual');
+    var manualBox = document.getElementById('manual-table-box');
+    var tableLoading = document.getElementById('table-loading');
+    var tableEmpty = document.getElementById('table-empty');
+    var tableListContainer = document.getElementById('table-list-container');
+    var tableSelectionSummary = document.getElementById('table-selection-summary');
+    var tablePickerStatus = document.getElementById('table-picker-status');
+
+    var oDate = document.getElementById('booking_date');
+    var oTime = document.getElementById('start_time');
+    var oArea = document.getElementById('area_id');
+    var oBranch = document.querySelector('input[name="branch_id"]');
+
+    var availableTablesUrl = @json(route('admin.bookings.available-tables'));
+    var oldTableIds = @json(array_map('intval', (array) old('table_ids', [])));
+
+    var loadedTables = [];
+    var fetchTimer = null;
+    var fetchSeq = 0;
+
+    function capNhatTomTat() {
+        var checked = tableListContainer.querySelectorAll('input[name="table_ids[]"]:checked');
+        if (checked.length === 0) {
+            tableSelectionSummary.textContent = 'Chưa chọn bàn nào (sẽ để hệ thống tự xếp nếu gửi).';
+            tableSelectionSummary.style.color = 'var(--muted, #64748b)';
+            return;
+        }
+
+        var codes = [];
+        var minSeats = 0;
+        var maxSeats = 0;
+        checked.forEach(function (cb) {
+            codes.push(cb.getAttribute('data-code'));
+            minSeats += parseInt(cb.getAttribute('data-seats-min') || '0', 10);
+            maxSeats += parseInt(cb.getAttribute('data-seats-max') || '0', 10);
+        });
+
+        tableSelectionSummary.textContent = 'Đã chọn ' + checked.length + ' bàn: ' + codes.join(', ') + ' (Sức chứa: ' + minSeats + '–' + maxSeats + ' khách)';
+        tableSelectionSummary.style.color = 'var(--primary, #0f172a)';
+    }
+
+    function renderDanhSachBan(tables) {
+        tableListContainer.innerHTML = '';
+        if (!tables || tables.length === 0) {
+            tableEmpty.style.display = 'block';
+            tableSelectionSummary.textContent = '';
+            return;
+        }
+        tableEmpty.style.display = 'none';
+
+        // Gom theo khu vuc
+        var groups = {};
+        tables.forEach(function (t) {
+            var area = t.area_name || 'Bàn chưa phân khu';
+            if (!groups[area]) groups[area] = [];
+            groups[area].push(t);
+        });
+
+        for (var areaName in groups) {
+            var groupDiv = document.createElement('div');
+            groupDiv.style.marginBottom = '6px';
+
+            var title = document.createElement('div');
+            title.style.fontWeight = '600';
+            title.style.fontSize = '12px';
+            title.style.textTransform = 'uppercase';
+            title.style.letterSpacing = '0.5px';
+            title.style.color = '#64748b';
+            title.style.marginBottom = '6px';
+            title.textContent = areaName;
+            groupDiv.appendChild(title);
+
+            var grid = document.createElement('div');
+            grid.style.display = 'grid';
+            grid.style.gridTemplateColumns = 'repeat(auto-fill, minmax(150px, 1fr))';
+            grid.style.gap = '8px';
+
+            groups[areaName].forEach(function (t) {
+                var card = document.createElement('label');
+                card.style.display = 'flex';
+                card.style.alignItems = 'center';
+                card.style.gap = '8px';
+                card.style.background = '#fff';
+                card.style.border = '1px solid #cbd5e1';
+                card.style.borderRadius = '6px';
+                card.style.padding = '6px 10px';
+                card.style.cursor = 'pointer';
+
+                var isSelected = oldTableIds.includes(t.id);
+                var cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.name = 'table_ids[]';
+                cb.value = t.id;
+                cb.checked = isSelected;
+                cb.setAttribute('data-code', t.code);
+                cb.setAttribute('data-seats-min', t.seats_min);
+                cb.setAttribute('data-seats-max', t.seats_max);
+                cb.addEventListener('change', capNhatTomTat);
+
+                var info = document.createElement('div');
+                var codeDiv = document.createElement('div');
+                codeDiv.style.fontWeight = '600';
+                codeDiv.style.fontSize = '13px';
+                codeDiv.textContent = t.code;
+
+                var capDiv = document.createElement('div');
+                capDiv.style.fontSize = '11px';
+                capDiv.style.color = '#64748b';
+                capDiv.textContent = t.capacity_label;
+
+                info.appendChild(codeDiv);
+                info.appendChild(capDiv);
+
+                card.appendChild(cb);
+                card.appendChild(info);
+                grid.appendChild(card);
+            });
+
+            groupDiv.appendChild(grid);
+            tableListContainer.appendChild(groupDiv);
+        }
+
+        capNhatTomTat();
+    }
+
+    async function taiBanTrong() {
+        if (!modeManual.checked) return;
+
+        var branchId = oBranch ? oBranch.value : '';
+        var date = oDate ? oDate.value : '';
+        var time = oTime ? oTime.value : '';
+        var areaId = oArea ? oArea.value : '';
+
+        if (!branchId || !date || !time) return;
+
+        var curSeq = ++fetchSeq;
+        tableLoading.style.display = 'block';
+        tableEmpty.style.display = 'none';
+        tableListContainer.innerHTML = '';
+        tableSelectionSummary.textContent = '';
+        tablePickerStatus.textContent = 'Đang kiểm tra bàn trống...';
+
+        try {
+            var url = availableTablesUrl + '?branch_id=' + encodeURIComponent(branchId)
+                + '&booking_date=' + encodeURIComponent(date)
+                + '&start_time=' + encodeURIComponent(time)
+                + (areaId ? '&area_id=' + encodeURIComponent(areaId) : '');
+
+            var res = await fetch(url, {
+                headers: { 'Accept': 'application/json' }
+            });
+            if (!res.ok) return;
+
+            var data = await res.json();
+            if (curSeq !== fetchSeq) return;
+
+            loadedTables = data.tables || [];
+            tableLoading.style.display = 'none';
+            tablePickerStatus.textContent = loadedTables.length + ' bàn trống';
+            renderDanhSachBan(loadedTables);
+        } catch (e) {
+            tableLoading.style.display = 'none';
+            tablePickerStatus.textContent = '';
+        }
+    }
+
+    function henTaiBanTrong() {
+        if (!modeManual.checked) return;
+        window.clearTimeout(fetchTimer);
+        fetchTimer = window.setTimeout(taiBanTrong, 300);
+    }
+
+    modeAuto.addEventListener('change', function () {
+        if (this.checked) {
+            manualBox.style.display = 'none';
+            tablePickerStatus.textContent = '';
+            var checked = tableListContainer.querySelectorAll('input[name="table_ids[]"]:checked');
+            checked.forEach(function (cb) { cb.checked = false; });
+            capNhatTomTat();
+        }
+    });
+
+    modeManual.addEventListener('change', function () {
+        if (this.checked) {
+            manualBox.style.display = 'block';
+            taiBanTrong();
+        }
+    });
+
+    if (oDate) oDate.addEventListener('change', henTaiBanTrong);
+    if (oTime) oTime.addEventListener('change', henTaiBanTrong);
+    if (oArea) oArea.addEventListener('change', henTaiBanTrong);
+
+    // Neu form quay lai do co loi va co old table_ids, bat che do manual ngay
+    if (oldTableIds.length > 0) {
+        modeManual.checked = true;
+        manualBox.style.display = 'block';
+        taiBanTrong();
     }
 })();
 </script>

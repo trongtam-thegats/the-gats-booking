@@ -122,7 +122,7 @@ class AdminPanelTest extends TestCase
             'party_size' => 2,
             'booking_date' => Carbon::tomorrow()->toDateString(),
             'start_time' => '19:00',
-        ], $overrides));
+        ], $overrides), $this->admin);
     }
 
     // ---------- Dang nhap ----------

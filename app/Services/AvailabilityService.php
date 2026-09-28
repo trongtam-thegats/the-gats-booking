@@ -404,6 +404,21 @@ class AvailabilityService
 
             // Danh gia cac to hop ung vien
             foreach ($candidates as $combo) {
+                // Khong bao gio ghep ban neu mot ban don trong to hop da du suc chua so khach
+                foreach ($combo as $t) {
+                    if ($t->seats_max >= $partySize) {
+                        continue 2;
+                    }
+                }
+
+                // Doan tu 3 khach tro xuong: TUYET DOI khong ghep ban (tru truong hop ghep cac ghe bar rieng le hoac ghe 1 cho)
+                if ($partySize <= 3) {
+                    $allBar = collect($combo)->every(fn (DiningTable $t) => $t->table_type === 'bar_seat' || $t->seats_max <= 1);
+                    if (! $allBar) {
+                        continue;
+                    }
+                }
+
                 $totalSeats = $this->tongSucChuaToHop($combo);
                 if ($totalSeats < $partySize) {
                     continue;
