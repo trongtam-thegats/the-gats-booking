@@ -280,93 +280,226 @@ class AvailabilityService
      * @param  Collection<int, DiningTable>  $tables
      * @return array<int, DiningTable>
      */
-    public function pickTables(Collection $tables, int $partySize): array
-    {
-        // 1. Uu tien ban don vua khit nhat:
-        // Ban phai thoa man: seats_min <= partySize <= seats_max.
-        // Uu tien ban co seats_max nho nhat (it thua cho nhat), roi den sort_order.
-        $singleFit = $tables
-            ->filter(fn (DiningTable $t) => $t->seats_min <= $partySize && $t->seats_max >= $partySize)
-            ->sortBy([
-                fn (DiningTable $a, DiningTable $b) => $a->seats_max <=> $b->seats_max,
-                fn (DiningTable $a, DiningTable $b) => $a->sort_order <=> $b->sort_order,
-            ])
-            ->first();
-
-        if ($singleFit) {
-            return [$singleFit];
-        }
-
-        // 2. Ghep cac ban nho phu hop (trong cung khu vuc, uu tien cac cap ban lien ke nhau).
-        $combo = $this->timComboGhepBan($tables, $partySize);
-        if ($combo) {
-            return $combo;
-        }
-
-        // 3. Neu khong co ban don vua khit va khong the ghep ban nho:
-        // Chi cho phep xep ban don lon hon neu seats_min khong vuot qua nguong cho phep
-        // va tuyet doi khong xep khach it nguoi (<= 3 khach) vao ban lon/Sofa (seats_min >= 4).
-        $singleTolerant = $tables
-            ->filter(function (DiningTable $t) use ($partySize) {
-                if ($t->seats_max < $partySize) {
-                    return false;
-                }
-                // Khach tu 3 nguoi tro xuong: TUYET DOI KHONG xep vao ban co seats_min >= 4 (nhu Sofa, Dining Room)
-                if ($partySize <= 3 && $t->seats_min >= 4) {
-                    return false;
-                }
-                // Khong chenh lech qua 2 cho so voi seats_min
-                return ($t->seats_min - $partySize) <= 2;
-            })
-            ->sortBy([
-                fn (DiningTable $a, DiningTable $b) => $a->seats_max <=> $b->seats_max,
-                fn (DiningTable $a, DiningTable $b) => $a->sort_order <=> $b->sort_order,
-            ])
-            ->first();
-
-        if ($singleTolerant) {
-            return [$singleTolerant];
-        }
-
-        return [];
-    }
-
     /**
-     * Tim to hop ban ghep phu hop nhat trong cung khu vuc.
-     * Uu tien cac ban lien ke nhau (neu quan da dinh nghia so do ban lien ke).
+     * Chon bo ban phu hop nhat cho so khach theo co che phan tang uu tien (Tiered Priority Matching):
+     * 1. Bar: 1-2 khach uu tien xep truoc. Toi da 3 khach cho Bar nhung chi xep khi ban cao het cho.
+     * 2. Ban cao: uu tien nhan tu 3 den 6 khach truoc.
+     * 3. Sofa: uu tien xep cac nhom tren 6 khach truoc. Cac nhom <= 6 khach chi nhan vao 1 ban sofa don khi ban cao het cho.
+     *    Khach 2 nguoi duoc phep fallback vao 1 ban sofa don neu het ca Bar va Ban cao.
+     * 4. Uu tien ban co so ghe matching nhat (thua it cho nhat).
      *
      * @param  Collection<int, DiningTable>  $tables
      * @return array<int, DiningTable>
      */
-    protected function timComboGhepBan(Collection $tables, int $partySize): array
+    public function pickTables(Collection $tables, int $partySize): array
+    {
+        $candidates = [];
+
+        // 1. Cac ban don
+        foreach ($tables as $table) {
+            if ($table->seats_max >= $partySize) {
+                $tier = $this->hangUuTienToHop([$table], $partySize);
+                if ($tier !== null) {
+                    $candidates[] = [
+                        'tables' => [$table],
+                        'tier' => $tier,
+                        'excess' => (int) $table->seats_max - $partySize,
+                        'count' => 1,
+                        'sort' => (int) $table->sort_order,
+                    ];
+                }
+            }
+        }
+
+        // 2. Cac to hop ban ghep
+        $combos = $this->layCacToHopGhepBan($tables, $partySize);
+        foreach ($combos as $combo) {
+            $tier = $this->hangUuTienToHop($combo, $partySize);
+            if ($tier !== null) {
+                $totalSeats = $this->tongSucChuaToHop($combo);
+                $candidates[] = [
+                    'tables' => $combo,
+                    'tier' => $tier,
+                    'excess' => $totalSeats - $partySize,
+                    'count' => count($combo),
+                    'sort' => array_sum(array_map(fn (DiningTable $t) => (int) $t->sort_order, $combo)),
+                ];
+            }
+        }
+
+        if (empty($candidates)) {
+            return [];
+        }
+
+        // Sap xep danh sach ung vien:
+        // 1. Tier uu tien cao nhat (Tier 1 < Tier 2 < Tier 3)
+        // 2. Matching nhat: thua it cho nhat (excess nho nhat)
+        // 3. It ban nhat (1 ban uu tien hon ghep nhieu ban)
+        // 4. Thu tu sort_order nho nhat
+        usort($candidates, function (array $a, array $b) {
+            if ($a['tier'] !== $b['tier']) {
+                return $a['tier'] <=> $b['tier'];
+            }
+            if ($a['excess'] !== $b['excess']) {
+                return $a['excess'] <=> $b['excess'];
+            }
+            if ($a['count'] !== $b['count']) {
+                return $a['count'] <=> $b['count'];
+            }
+            return $a['sort'] <=> $b['sort'];
+        });
+
+        return $candidates[0]['tables'];
+    }
+
+    /**
+     * Tinh hang uu tien (Tier) cua mot phuong an xep ban (1 ban hoac to hop ban).
+     * Tier 1 = Uu tien cao nhat, Tier 2 = Uu tien tiep theo, Tier 3 = Fallback du phong.
+     * Tra ve null neu phuong an khong hop le theo quy tac cua quan.
+     *
+     * @param  array<int, DiningTable>  $combo
+     */
+    protected function hangUuTienToHop(array $combo, int $partySize): ?int
+    {
+        $isCombo = count($combo) > 1;
+        $count = count($combo);
+        $first = $combo[0];
+
+        $isBar = collect($combo)->every(fn (DiningTable $t) => $t->table_type === 'bar_seat' || $t->seats_max <= 1);
+        $isHighTable = collect($combo)->every(fn (DiningTable $t) => $t->table_type === 'high_table');
+        $isSofa = collect($combo)->every(fn (DiningTable $t) => $t->table_type === 'sofa');
+        $isDining = collect($combo)->every(fn (DiningTable $t) => $t->table_type === 'dining');
+
+        $seatsMax = $isCombo ? $this->tongSucChuaToHop($combo) : (int) $first->seats_max;
+
+        if ($seatsMax < $partySize) {
+            return null;
+        }
+
+        // 1 KHACH:
+        // Bar 1-2 xep truoc
+        if ($partySize === 1) {
+            if ($isCombo) {
+                return null;
+            }
+            if ($isBar) {
+                return 1;
+            }
+            if (($isHighTable || $isDining) && $seatsMax <= 4) {
+                return 2;
+            }
+            if ($isSofa && $seatsMax <= 2) {
+                return 2;
+            }
+            return null;
+        }
+
+        // 2 KHACH:
+        // Bar: 1-2 xep truoc; Ban cao nhan tiep theo; Sofa la fallback cuoi cung (chi 1 ban don nho)
+        if ($partySize === 2) {
+            if ($isCombo) {
+                return ($isBar && $count === 2) ? 1 : null;
+            }
+            if ($isBar && $seatsMax >= 2) {
+                return 1;
+            }
+            if ($isHighTable || $isDining) {
+                return ($seatsMax <= 6) ? 2 : null;
+            }
+            if ($isSofa) {
+                if ($seatsMax <= 2) {
+                    return 1;
+                }
+                // Fallback 1 ban sofa don (chi nhan ban sofa nho nhu Sofa 1 max 6 cho, khong nhan sofa 8 cho)
+                return ($seatsMax <= 6) ? 3 : null;
+            }
+            return ($seatsMax <= 4) ? 2 : 3;
+        }
+
+        // 3 KHACH:
+        // Ban cao uu tien truoc (3-6 khach); Bar toi da 3 khach khi ban cao het cho; Sofa fallback (chi 1 ban)
+        if ($partySize === 3) {
+            if ($isCombo) {
+                return ($isBar && $count === 3) ? 2 : null;
+            }
+            if ($isHighTable || $isDining) {
+                return ($seatsMax <= 6) ? 1 : null;
+            }
+            if ($isSofa) {
+                if ($seatsMax <= 3) {
+                    return 1;
+                }
+                return ($seatsMax <= 6) ? 3 : null;
+            }
+            return 2;
+        }
+
+        // 4 DEN 6 KHACH:
+        // Ban cao uu tien tu 3 den 6 khach truoc.
+        // Sofa thi cac nhom duoi 6 khach chi nhan vao khi ban cao 4-6 het cho (chi 1 ban sofa don).
+        if ($partySize >= 4 && $partySize <= 6) {
+            if ($isCombo) {
+                return null; // Khong ghep ban cho doan <= 6 khach
+            }
+            if ($isHighTable || ($isDining && $seatsMax <= 6)) {
+                return 1;
+            }
+            if ($isSofa) {
+                return 2;
+            }
+            if ($isDining && $seatsMax > 6) {
+                return 3; // Dining Room lon
+            }
+            return 2;
+        }
+
+        // TREN 6 KHACH (> 6):
+        // Sofa uu tien xep cac nhom tren 6 khach truoc.
+        if (! $isCombo) {
+            if ($isSofa || $isDining) {
+                return 1;
+            }
+            return 2;
+        }
+
+        // Ghep ban cho doan tren 6 khach:
+        if ($isSofa) {
+            return 2; // Ghep Sofa 1+2 hoac Sofa 3+4 (toi da 18)
+        }
+
+        if ($isHighTable && $count <= 2) {
+            return 2;
+        }
+
+        return 3;
+    }
+
+    /**
+     * Lay tat ca cac to hop ban ghep co the phuc vu doan khach trong cung khu vuc.
+     *
+     * @param  Collection<int, DiningTable>  $tables
+     * @return array<int, array<int, DiningTable>>
+     */
+    protected function layCacToHopGhepBan(Collection $tables, int $partySize): array
     {
         $combinableTables = $tables->filter(fn (DiningTable $t) => $t->combinable);
-
         $groups = $combinableTables->groupBy(fn (DiningTable $t) => (string) ($t->area_id ?? 'none'));
 
-        $bestCombo = null;
-        $bestExcess = PHP_INT_MAX;
-        $bestCount = PHP_INT_MAX;
-        $bestSort = PHP_INT_MAX;
+        $allCombos = [];
 
         foreach ($groups as $group) {
             $groupTables = $group->values();
-            $tableCount = $groupTables->count();
-
-            if ($tableCount < 2) {
+            if ($groupTables->count() < 2) {
                 continue;
             }
 
             $firstTable = $groupTables->first();
             $maxLimit = $this->maxTablesPerCombo($firstTable);
-
-            // Kiem tra xem trong nhom nay co ban nao da duoc khai bao ban lien ke khong
             $coKhaiBaoLienKe = $groupTables->contains(fn (DiningTable $t) => $t->combinedTables->isNotEmpty());
 
             $candidates = [];
 
             if ($coKhaiBaoLienKe) {
-                // Duyet theo do thi lien ke: BFS tu tung ban de tim cac chuoi lien ke
                 $idMap = $groupTables->keyBy('id');
                 $visitedSets = [];
 
@@ -381,8 +514,6 @@ class AvailabilityService
                     );
                 }
             } else {
-                // Truong hop chi nhanh chua thiet lap cap ban lien ke:
-                // Tim tap hop ban trong cung khu vuc (uu tien thu tu sort_order gan nhau)
                 $sorted = $groupTables->sortBy('sort_order')->values();
                 $picked = [];
                 $seats = 0;
@@ -402,7 +533,6 @@ class AvailabilityService
                 }
             }
 
-            // Danh gia cac to hop ung vien
             foreach ($candidates as $combo) {
                 // Khong bao gio ghep ban neu mot ban don trong to hop da du suc chua so khach
                 foreach ($combo as $t) {
@@ -411,36 +541,64 @@ class AvailabilityService
                     }
                 }
 
-                // Doan tu 3 khach tro xuong: TUYET DOI khong ghep ban (tru truong hop ghep cac ghe bar rieng le hoac ghe 1 cho)
-                if ($partySize <= 3) {
-                    $allBar = collect($combo)->every(fn (DiningTable $t) => $t->table_type === 'bar_seat' || $t->seats_max <= 1);
-                    if (! $allBar) {
-                        continue;
-                    }
-                }
-
                 $totalSeats = $this->tongSucChuaToHop($combo);
                 if ($totalSeats < $partySize) {
                     continue;
                 }
 
-                $excess = $totalSeats - $partySize;
-                $count = count($combo);
-                $sort = array_sum(array_map(fn (DiningTable $t) => (int) $t->sort_order, $combo));
-
-                // So sanh: it thua cho nhat -> it ban nhat -> sort_order nho nhat
-                if ($excess < $bestExcess ||
-                    ($excess === $bestExcess && $count < $bestCount) ||
-                    ($excess === $bestExcess && $count === $bestCount && $sort < $bestSort)) {
-                    $bestCombo = $combo;
-                    $bestExcess = $excess;
-                    $bestCount = $count;
-                    $bestSort = $sort;
-                }
+                $allCombos[] = $combo;
             }
         }
 
-        return $bestCombo ?? [];
+        return $allCombos;
+    }
+
+    /**
+     * Helper tra ve to hop ghep tot nhat neu can.
+     *
+     * @param  Collection<int, DiningTable>  $tables
+     * @return array<int, DiningTable>
+     */
+    public function timComboGhepBan(Collection $tables, int $partySize): array
+    {
+        $combos = $this->layCacToHopGhepBan($tables, $partySize);
+        if (empty($combos)) {
+            return [];
+        }
+
+        $valid = [];
+        foreach ($combos as $combo) {
+            $tier = $this->hangUuTienToHop($combo, $partySize);
+            if ($tier !== null) {
+                $totalSeats = $this->tongSucChuaToHop($combo);
+                $valid[] = [
+                    'tables' => $combo,
+                    'tier' => $tier,
+                    'excess' => $totalSeats - $partySize,
+                    'count' => count($combo),
+                    'sort' => array_sum(array_map(fn (DiningTable $t) => (int) $t->sort_order, $combo)),
+                ];
+            }
+        }
+
+        if (empty($valid)) {
+            return [];
+        }
+
+        usort($valid, function (array $a, array $b) {
+            if ($a['tier'] !== $b['tier']) {
+                return $a['tier'] <=> $b['tier'];
+            }
+            if ($a['excess'] !== $b['excess']) {
+                return $a['excess'] <=> $b['excess'];
+            }
+            if ($a['count'] !== $b['count']) {
+                return $a['count'] <=> $b['count'];
+            }
+            return $a['sort'] <=> $b['sort'];
+        });
+
+        return $valid[0]['tables'];
     }
 
     /**

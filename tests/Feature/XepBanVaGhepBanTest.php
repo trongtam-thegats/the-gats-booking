@@ -186,10 +186,11 @@ class XepBanVaGhepBanTest extends TestCase
         $this->assertEmpty($picked, 'Hai ban khong lien ke khong duoc tu dong ghep.');
     }
 
-    public function test_khach_2_nguoi_khong_bao_gio_tu_dong_vao_sofa_khi_het_ban_khac(): void
+    public function test_khach_2_nguoi_tu_dong_fallback_vao_sofa_1_khi_het_ban_khac(): void
     {
-        $this->branch->diningTables()->create([
+        $sofa = $this->branch->diningTables()->create([
             'code' => 'Sofa 1',
+            'table_type' => 'sofa',
             'seats_min' => 4,
             'seats_max' => 6,
             'combinable' => false,
@@ -197,9 +198,7 @@ class XepBanVaGhepBanTest extends TestCase
             'sort_order' => 1,
         ]);
 
-        $this->expectException(\App\Exceptions\BookingUnavailableException::class);
-
-        app(BookingService::class)->create($this->branch, [
+        $booking = app(BookingService::class)->create($this->branch, [
             'customer_name' => 'Le Van C',
             'customer_phone' => '0912345678',
             'party_size' => 2,
@@ -207,6 +206,8 @@ class XepBanVaGhepBanTest extends TestCase
             'start_time' => '19:00',
             'source' => 'online',
         ]);
+
+        $this->assertTrue($booking->diningTables->contains($sofa));
     }
 
     public function test_nhan_vien_co_the_xep_thu_cong_vao_sofa_cho_khach_2_nguoi(): void
@@ -646,8 +647,108 @@ class XepBanVaGhepBanTest extends TestCase
         $tables = $this->branch->diningTables()->with('combinedTables')->whereIn('id', [$s1->id, $s2->id])->get();
         $avail = app(AvailabilityService::class);
 
-        // Khach 2 nguoi: TUYET DOI khong duoc ghep S1 + S2
+        // Khach 2 nguoi: TUYET DOI khong duoc ghep S1 + S2, nhung co the fallback vao 1 ban Sofa 1
         $picked = $avail->pickTables($tables, 2);
-        $this->assertEmpty($picked);
+        $this->assertCount(1, $picked, 'Chi duoc phep nhan 1 ban sofa don, khong duoc ghep');
+        $this->assertSame($s1->id, $picked[0]->id);
+
+        // Khong xep 2 khach vao Sofa lon (Sofa 2: 5-8 cho)
+        $pickedS2 = $avail->pickTables(collect([$s2]), 2);
+        $this->assertEmpty($pickedS2, 'Khong duoc xep 2 khach vao Sofa lon 8 cho');
+    }
+
+    public function test_phan_tang_uu_tien_khach_2_nguoi_bar_truoc_ban_cao_truoc_sofa(): void
+    {
+        $avail = app(AvailabilityService::class);
+
+        $barArea = $this->branch->areas()->create(['name' => 'Bar', 'bookable' => true]);
+        $highArea = $this->branch->areas()->create(['name' => 'Bàn Cao', 'bookable' => true]);
+        $sofaArea = $this->branch->areas()->create(['name' => 'Sofa', 'bookable' => true]);
+
+        $b1 = $this->branch->diningTables()->create(['area_id' => $barArea->id, 'code' => 'Bar 1', 'table_type' => 'bar_seat', 'seats_min' => 1, 'seats_max' => 1, 'combinable' => true, 'is_active' => true, 'sort_order' => 1]);
+        $b2 = $this->branch->diningTables()->create(['area_id' => $barArea->id, 'code' => 'Bar 2', 'table_type' => 'bar_seat', 'seats_min' => 1, 'seats_max' => 1, 'combinable' => true, 'is_active' => true, 'sort_order' => 2]);
+        $b1->combinedTables()->attach($b2->id);
+        $b2->combinedTables()->attach($b1->id);
+
+        $t1 = $this->branch->diningTables()->create(['area_id' => $highArea->id, 'code' => 'T1', 'table_type' => 'high_table', 'seats_min' => 2, 'seats_max' => 4, 'combinable' => false, 'is_active' => true, 'sort_order' => 10]);
+        $s1 = $this->branch->diningTables()->create(['area_id' => $sofaArea->id, 'code' => 'Sofa 1', 'table_type' => 'sofa', 'seats_min' => 4, 'seats_max' => 6, 'combinable' => true, 'is_active' => true, 'sort_order' => 20]);
+
+        // 1. Co ca Bar, Ban cao, Sofa -> Uu tien ghep 2 Bar
+        $all = collect([$b1, $b2, $t1, $s1]);
+        $picked1 = $avail->pickTables($all, 2);
+        $this->assertCount(2, $picked1);
+        $this->assertEqualsCanonicalizing([$b1->id, $b2->id], array_map(fn ($t) => $t->id, $picked1));
+
+        // 2. Het Bar, con Ban cao va Sofa -> Uu tien Ban cao T1
+        $noBar = collect([$t1, $s1]);
+        $picked2 = $avail->pickTables($noBar, 2);
+        $this->assertCount(1, $picked2);
+        $this->assertSame($t1->id, $picked2[0]->id);
+
+        // 3. Het ca Bar va Ban cao, con Sofa 1 -> Fallback vao Sofa 1
+        $onlySofa = collect([$s1]);
+        $picked3 = $avail->pickTables($onlySofa, 2);
+        $this->assertCount(1, $picked3);
+        $this->assertSame($s1->id, $picked3[0]->id);
+    }
+
+    public function test_phan_tang_uu_tien_khach_3_nguoi_ban_cao_truoc_bar_truoc_sofa(): void
+    {
+        $avail = app(AvailabilityService::class);
+
+        $barArea = $this->branch->areas()->create(['name' => 'Bar', 'bookable' => true]);
+        $highArea = $this->branch->areas()->create(['name' => 'Bàn Cao', 'bookable' => true]);
+        $sofaArea = $this->branch->areas()->create(['name' => 'Sofa', 'bookable' => true]);
+
+        $b1 = $this->branch->diningTables()->create(['area_id' => $barArea->id, 'code' => 'Bar 1', 'table_type' => 'bar_seat', 'seats_min' => 1, 'seats_max' => 1, 'combinable' => true, 'is_active' => true, 'sort_order' => 1]);
+        $b2 = $this->branch->diningTables()->create(['area_id' => $barArea->id, 'code' => 'Bar 2', 'table_type' => 'bar_seat', 'seats_min' => 1, 'seats_max' => 1, 'combinable' => true, 'is_active' => true, 'sort_order' => 2]);
+        $b3 = $this->branch->diningTables()->create(['area_id' => $barArea->id, 'code' => 'Bar 3', 'table_type' => 'bar_seat', 'seats_min' => 1, 'seats_max' => 1, 'combinable' => true, 'is_active' => true, 'sort_order' => 3]);
+        $b1->combinedTables()->attach($b2->id);
+        $b2->combinedTables()->attach([$b1->id, $b3->id]);
+        $b3->combinedTables()->attach($b2->id);
+
+        $t1 = $this->branch->diningTables()->create(['area_id' => $highArea->id, 'code' => 'T1', 'table_type' => 'high_table', 'seats_min' => 2, 'seats_max' => 4, 'combinable' => false, 'is_active' => true, 'sort_order' => 10]);
+        $s1 = $this->branch->diningTables()->create(['area_id' => $sofaArea->id, 'code' => 'Sofa 1', 'table_type' => 'sofa', 'seats_min' => 4, 'seats_max' => 6, 'combinable' => true, 'is_active' => true, 'sort_order' => 20]);
+
+        // 1. Co ca Ban cao, Bar, Sofa -> Uu tien Ban cao T1
+        $all = collect([$b1, $b2, $b3, $t1, $s1]);
+        $picked1 = $avail->pickTables($all, 3);
+        $this->assertCount(1, $picked1);
+        $this->assertSame($t1->id, $picked1[0]->id);
+
+        // 2. Het Ban cao, con Bar va Sofa -> Uu tien ghep 3 ghe Bar
+        $noHigh = collect([$b1, $b2, $b3, $s1]);
+        $picked2 = $avail->pickTables($noHigh, 3);
+        $this->assertCount(3, $picked2);
+        $this->assertEqualsCanonicalizing([$b1->id, $b2->id, $b3->id], array_map(fn ($t) => $t->id, $picked2));
+
+        // 3. Het ca Ban cao va Bar, con Sofa 1 -> Fallback vao Sofa 1
+        $onlySofa = collect([$s1]);
+        $picked3 = $avail->pickTables($onlySofa, 3);
+        $this->assertCount(1, $picked3);
+        $this->assertSame($s1->id, $picked3[0]->id);
+    }
+
+    public function test_phan_tang_uu_tien_khach_5_nguoi_ban_cao_truoc_sofa(): void
+    {
+        $avail = app(AvailabilityService::class);
+
+        $highArea = $this->branch->areas()->create(['name' => 'Bàn Cao', 'bookable' => true]);
+        $sofaArea = $this->branch->areas()->create(['name' => 'Sofa', 'bookable' => true]);
+
+        $t4 = $this->branch->diningTables()->create(['area_id' => $highArea->id, 'code' => 'T4', 'table_type' => 'high_table', 'seats_min' => 4, 'seats_max' => 6, 'combinable' => false, 'is_active' => true, 'sort_order' => 4]);
+        $s1 = $this->branch->diningTables()->create(['area_id' => $sofaArea->id, 'code' => 'Sofa 1', 'table_type' => 'sofa', 'seats_min' => 4, 'seats_max' => 6, 'combinable' => true, 'is_active' => true, 'sort_order' => 10]);
+
+        // 1. Co ca Ban cao 4-6 va Sofa 1 -> Uu tien Ban cao T4
+        $all = collect([$t4, $s1]);
+        $picked1 = $avail->pickTables($all, 5);
+        $this->assertCount(1, $picked1);
+        $this->assertSame($t4->id, $picked1[0]->id);
+
+        // 2. Het Ban cao -> Fallback vao Sofa 1
+        $onlySofa = collect([$s1]);
+        $picked2 = $avail->pickTables($onlySofa, 5);
+        $this->assertCount(1, $picked2);
+        $this->assertSame($s1->id, $picked2[0]->id);
     }
 }

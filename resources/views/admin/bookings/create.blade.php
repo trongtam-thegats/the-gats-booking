@@ -63,17 +63,6 @@
                 </select>
             </div>
 
-            @if ($areas->isNotEmpty())
-                <div class="field">
-                    <label for="area_id">Khu vực</label>
-                    <select id="area_id" name="area_id">
-                        <option value="">Không yêu cầu</option>
-                        @foreach ($areas as $area)
-                            <option value="{{ $area->id }}" @selected(old('area_id') == $area->id)>{{ $area->name }}</option>
-                        @endforeach
-                    </select>
-                </div>
-            @endif
 
             <div class="field full" id="table-picker-section" style="margin-top:4px">
                 <label style="display:flex; justify-content:space-between; align-items:center">
@@ -275,7 +264,6 @@
 
     var oDate = document.getElementById('booking_date');
     var oTime = document.getElementById('start_time');
-    var oArea = document.getElementById('area_id');
     var oBranch = document.querySelector('input[name="branch_id"]');
 
     var availableTablesUrl = @json(route('admin.bookings.available-tables'));
@@ -396,7 +384,6 @@
         var branchId = oBranch ? oBranch.value : '';
         var date = oDate ? oDate.value : '';
         var time = oTime ? oTime.value : '';
-        var areaId = oArea ? oArea.value : '';
 
         if (!branchId || !date || !time) return;
 
@@ -410,8 +397,7 @@
         try {
             var url = availableTablesUrl + '?branch_id=' + encodeURIComponent(branchId)
                 + '&booking_date=' + encodeURIComponent(date)
-                + '&start_time=' + encodeURIComponent(time)
-                + (areaId ? '&area_id=' + encodeURIComponent(areaId) : '');
+                + '&start_time=' + encodeURIComponent(time);
 
             var res = await fetch(url, {
                 headers: { 'Accept': 'application/json' }
@@ -456,7 +442,6 @@
 
     if (oDate) oDate.addEventListener('change', henTaiBanTrong);
     if (oTime) oTime.addEventListener('change', henTaiBanTrong);
-    if (oArea) oArea.addEventListener('change', henTaiBanTrong);
 
     // Neu form quay lai do co loi va co old table_ids, bat che do manual ngay
     if (oldTableIds.length > 0) {
